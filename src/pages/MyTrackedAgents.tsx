@@ -85,14 +85,27 @@ export default function MyTrackedAgents() {
             {trackedAgents.length} agent{trackedAgents.length !== 1 ? "s" : ""} in your watchlist
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate("/leaderboard")}
-          className="border-border text-foreground-muted gap-1.5 text-xs"
-        >
-          <Plus size={12} /> Add Agents
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/leaderboard")}
+            className="border-border text-foreground-muted gap-1.5 text-xs"
+          >
+            <Plus size={12} /> Add Agents
+          </Button>
+          {trackedAgents.length > 0 && (
+            <Button
+              size="sm"
+              onClick={loadMetricsForAll}
+              disabled={loadingAddresses.size > 0}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5 text-xs"
+            >
+              <RefreshCw size={12} className={loadingAddresses.size > 0 ? "animate-spin" : ""} />
+              {loadingAddresses.size > 0 ? "Loading…" : "Load Metrics"}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Empty state */}
