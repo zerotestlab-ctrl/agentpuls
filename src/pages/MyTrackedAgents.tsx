@@ -37,8 +37,8 @@ export default function MyTrackedAgents() {
   const [agentMetrics, setAgentMetrics] = useState<Record<string, AgentMetrics>>({});
   const [loadingAddresses, setLoadingAddresses] = useState<Set<string>>(new Set());
 
-  // Load metrics for tracked agents not already in metricsMap
-  useEffect(() => {
+  /** Manual load — called explicitly by user clicking "Load Metrics" */
+  const loadMetricsForAll = useCallback(async () => {
     const toLoad = trackedAgents.filter(
       (a) => !metricsMap[a.address] && !agentMetrics[a.address],
     );
@@ -50,24 +50,24 @@ export default function MyTrackedAgents() {
       return next;
     });
 
-    Promise.allSettled(
+    const results = await Promise.allSettled(
       toLoad.map(async (agent) => {
         const txs = await fetchTransactions(agent.chain, agent.address, apiKey, 50);
         const agentInfo = { ...agent, framework: (agent as any).framework ?? "Unknown" };
         const m = computeAgentMetrics(agentInfo, txs);
         return { address: agent.address, metrics: m };
       }),
-    ).then((results) => {
-      const updates: Record<string, AgentMetrics> = {};
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          updates[result.value.address] = result.value.metrics;
-        }
+    );
+
+    const updates: Record<string, AgentMetrics> = {};
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        updates[result.value.address] = result.value.metrics;
       }
-      setAgentMetrics((prev) => ({ ...prev, ...updates }));
-      setLoadingAddresses(new Set());
-    });
-  }, [trackedAgents, apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    }
+    setAgentMetrics((prev) => ({ ...prev, ...updates }));
+    setLoadingAddresses(new Set());
+  }, [trackedAgents, apiKey, metricsMap, agentMetrics]);
 
   const allMetrics = (address: string) =>
     metricsMap[address] ?? agentMetrics[address];
