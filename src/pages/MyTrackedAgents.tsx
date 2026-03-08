@@ -1,8 +1,9 @@
 /**
  * AgentPulse — My Tracked Agents Watchlist
- * Portfolio-style page of user-tracked agents with live performance tiles.
+ * Portfolio-style page of user-tracked agents.
+ * Metrics loaded on demand via "Load Metrics" button (no auto-fetch loops).
  */
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AreaChart,
@@ -22,7 +23,6 @@ import { Button } from "@/components/ui/button";
 import {
   Star,
   StarOff,
-  ExternalLink,
   TrendingUp,
   Activity,
   Zap,
@@ -30,7 +30,6 @@ import {
   Plus,
   RefreshCw,
 } from "lucide-react";
-import { useState, useEffect } from "react";
 
 export default function MyTrackedAgents() {
   const { trackedAgents, untrackAgent, apiKey, metricsMap } = useApp();
@@ -38,8 +37,8 @@ export default function MyTrackedAgents() {
   const [agentMetrics, setAgentMetrics] = useState<Record<string, AgentMetrics>>({});
   const [loadingAddresses, setLoadingAddresses] = useState<Set<string>>(new Set());
 
-  // Load metrics for tracked agents not already in metricsMap
-  useEffect(() => {
+  /** Manual load — called explicitly by user clicking "Load Metrics" */
+  const loadMetricsForAll = useCallback(async () => {
     const toLoad = trackedAgents.filter(
       (a) => !metricsMap[a.address] && !agentMetrics[a.address],
     );
@@ -51,24 +50,24 @@ export default function MyTrackedAgents() {
       return next;
     });
 
-    Promise.allSettled(
+    const results = await Promise.allSettled(
       toLoad.map(async (agent) => {
         const txs = await fetchTransactions(agent.chain, agent.address, apiKey, 50);
         const agentInfo = { ...agent, framework: (agent as any).framework ?? "Unknown" };
         const m = computeAgentMetrics(agentInfo, txs);
         return { address: agent.address, metrics: m };
       }),
-    ).then((results) => {
-      const updates: Record<string, AgentMetrics> = {};
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          updates[result.value.address] = result.value.metrics;
-        }
+    );
+
+    const updates: Record<string, AgentMetrics> = {};
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        updates[result.value.address] = result.value.metrics;
       }
-      setAgentMetrics((prev) => ({ ...prev, ...updates }));
-      setLoadingAddresses(new Set());
-    });
-  }, [trackedAgents, apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    }
+    setAgentMetrics((prev) => ({ ...prev, ...updates }));
+    setLoadingAddresses(new Set());
+  }, [trackedAgents, apiKey, metricsMap, agentMetrics]);
 
   const allMetrics = (address: string) =>
     metricsMap[address] ?? agentMetrics[address];
@@ -86,14 +85,27 @@ export default function MyTrackedAgents() {
             {trackedAgents.length} agent{trackedAgents.length !== 1 ? "s" : ""} in your watchlist
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate("/leaderboard")}
-          className="border-border text-foreground-muted gap-1.5 text-xs"
-        >
-          <Plus size={12} /> Add Agents
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/leaderboard")}
+            className="border-border text-foreground-muted gap-1.5 text-xs"
+          >
+            <Plus size={12} /> Add Agents
+          </Button>
+          {trackedAgents.length > 0 && (
+            <Button
+              size="sm"
+              onClick={loadMetricsForAll}
+              disabled={loadingAddresses.size > 0}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5 text-xs"
+            >
+              <RefreshCw size={12} className={loadingAddresses.size > 0 ? "animate-spin" : ""} />
+              {loadingAddresses.size > 0 ? "Loading…" : "Load Metrics"}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Empty state */}

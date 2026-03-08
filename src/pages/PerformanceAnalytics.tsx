@@ -1,5 +1,5 @@
 /**
- * AgentLens — Performance Analytics Page
+ * AgentPulse — Performance Analytics Page
  * Multi-line charts + failure heatmap
  */
 import { useMemo } from "react";

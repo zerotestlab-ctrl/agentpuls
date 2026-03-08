@@ -1,5 +1,5 @@
 /**
- * AgentLens — Cross-Chain Benchmarks Page
+ * AgentPulse — Cross-Chain Benchmarks Page
  * Bar charts comparing metrics across chains and frameworks
  */
 import { useMemo } from "react";

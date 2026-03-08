@@ -1,5 +1,5 @@
 /**
- * AgentLens — Failures Explorer Page
+ * AgentPulse — Failures Explorer Page
  * Detailed list of failed transactions with reasons + gas wasted
  */
 import { useMemo, useState } from "react";

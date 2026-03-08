@@ -1,14 +1,13 @@
 /**
  * AgentPulse — Global App Context
  *
- * Manages API key (with demo fallback), chain selection, agent data,
- * and auto-refresh with localStorage caching and toast notifications.
+ * Manages API key (with demo fallback), chain selection, agent data.
+ * NO auto-refresh. Data only loads when user explicitly clicks "Refresh Data".
  */
 import React, {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useRef,
   useState,
 } from "react";
@@ -66,6 +65,7 @@ interface AppContextValue {
   loadProgress: number; // 0-100
   error: string | null;
   lastRefreshed: Date | null;
+  hasLoaded: boolean; // whether any data load has ever completed
 
   // Tracked agents (watchlist)
   trackedAgents: TrackedAgent[];
@@ -73,17 +73,14 @@ interface AppContextValue {
   untrackAgent: (address: string) => void;
   isTracked: (address: string) => boolean;
 
-  // Actions
+  // Actions — manual only, no auto-refresh
   refresh: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-const AUTO_REFRESH_MS = 60_000;
-
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const storedKey = getApiKey();
-  // Use stored key if set, otherwise fall back to demo key
   const [apiKey, setApiKeyState] = useState(storedKey || DEMO_API_KEY);
   const [isDemo, setIsDemo] = useState(!storedKey);
   const [chain, setChainState] = useState<SupportedChain>(getSelectedChain);
@@ -92,9 +89,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loadProgress, setLoadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [trackedAgents, setTrackedAgents] = useState<TrackedAgent[]>(getTrackedAgents);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Abort ref to cancel in-flight requests on chain/key change
   const abortRef = useRef(false);
+  // Debounce: prevent double-clicks
   const lastRefreshTimeRef = useRef<number>(0);
 
   // Agents filtered by current chain
@@ -103,10 +103,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Flattened list of all txs across agents
   const allTxs = Object.values(metricsMap).flatMap((m) => m.recentTxs);
 
-  const refresh = useCallback(async (silent = false) => {
-    // Debounce: don't refresh if last refresh was <5s ago
+  /** Manual refresh — called only by explicit user action */
+  const refresh = useCallback(async () => {
+    // 3s debounce to prevent rapid clicks
     const now = Date.now();
-    if (now - lastRefreshTimeRef.current < 5_000) return;
+    if (now - lastRefreshTimeRef.current < 3_000) return;
     lastRefreshTimeRef.current = now;
 
     abortRef.current = false;
@@ -134,59 +135,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       setMetricsMap(newMetrics);
-      const now = new Date();
-      setLastRefreshed(now);
+      setLastRefreshed(new Date());
+      setHasLoaded(true);
 
-      if (silent) {
-        toast({
-          title: "Data refreshed",
-          description: `Updated ${agents.length} agents on ${chain}`,
-          duration: 2500,
-        });
-      }
+      toast({
+        title: "Data refreshed",
+        description: `Updated ${agents.length} agents on ${chain}`,
+        duration: 2500,
+      });
     } catch (err) {
       if (!abortRef.current) {
         const msg = err instanceof Error ? err.message : "Unknown error fetching data";
         setError(msg);
+        toast({
+          title: "Refresh failed",
+          description: msg,
+          variant: "destructive",
+          duration: 4000,
+        });
       }
     } finally {
       if (!abortRef.current) {
         setIsLoading(false);
+        setLoadProgress(100);
       }
     }
   }, [apiKey, agents, chain]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-refresh every 60s — only set up once per key/chain combo
-  useEffect(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    abortRef.current = false;
-
-    // Initial load
-    refresh(false);
-
-    // Auto-refresh silently
-    timerRef.current = setInterval(() => refresh(true), AUTO_REFRESH_MS);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      abortRef.current = true;
-    };
-  }, [apiKey, chain]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setAndSaveApiKey = (key: string) => {
     const trimmed = key.trim();
     setApiKey(trimmed);
     setApiKeyState(trimmed || DEMO_API_KEY);
     setIsDemo(!trimmed);
+    // Clear data so user can re-fetch with new key
     setMetricsMap({});
+    setHasLoaded(false);
     lastRefreshTimeRef.current = 0;
+    abortRef.current = true;
   };
 
   const setAndSaveChain = (c: SupportedChain) => {
     setSelectedChain(c);
     setChainState(c);
+    // Clear data for new chain
     setMetricsMap({});
+    setHasLoaded(false);
     lastRefreshTimeRef.current = 0;
+    abortRef.current = true;
   };
 
   const trackAgent = (agent: TrackedAgent) => {
@@ -225,11 +220,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         loadProgress,
         error,
         lastRefreshed,
+        hasLoaded,
         trackedAgents,
         trackAgent,
         untrackAgent,
         isTracked,
-        refresh: () => { lastRefreshTimeRef.current = 0; refresh(true); },
+        refresh,
       }}
     >
       {children}

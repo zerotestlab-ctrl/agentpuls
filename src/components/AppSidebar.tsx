@@ -1,8 +1,7 @@
 /**
  * AgentPulse — App Sidebar Navigation
- * Collapsible on desktop (icon mode), drawer on mobile
+ * Collapsible on desktop (icon mode), full drawer on mobile (auto-closes after selection)
  */
-import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -23,9 +22,11 @@ import {
   GitCompareArrows,
   Bug,
   BookOpen,
-  Activity,
   Star,
   Zap,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { CHAIN_LABELS } from "@/lib/agents";
@@ -41,14 +42,14 @@ const NAV_ITEMS = [
 ];
 
 export function AppSidebar() {
-  const { state, setOpenMobile } = useSidebar();
+  const { state, setOpenMobile, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
   const { chain, isLoading, lastRefreshed, trackedAgents } = useApp();
 
   const handleNavClick = (url: string) => {
-    // Close mobile sidebar on navigation
+    // Auto-close mobile drawer after selection
     setOpenMobile(false);
     navigate(url);
   };
@@ -56,18 +57,28 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
-      <SidebarHeader className="px-4 py-4 border-b border-sidebar-border">
+      <SidebarHeader className="px-3 py-3 border-b border-sidebar-border">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center flex-shrink-0 shadow-neon">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center flex-shrink-0 shadow-neon-sm">
             <Zap size={14} className="text-primary-foreground" />
           </div>
           {!collapsed && (
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-foreground leading-none">AgentPulse</p>
               <p className="text-[10px] text-foreground-muted mt-0.5 truncate">
                 AI Agent Analytics
               </p>
             </div>
+          )}
+          {/* Desktop collapse toggle */}
+          {!collapsed && (
+            <button
+              onClick={toggleSidebar}
+              className="ml-auto text-foreground-subtle hover:text-foreground transition-colors p-0.5 rounded hidden md:flex"
+              title="Collapse sidebar"
+            >
+              <ChevronLeft size={14} />
+            </button>
           )}
         </div>
       </SidebarHeader>
@@ -82,7 +93,7 @@ export function AppSidebar() {
 
                 return (
                   <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton asChild>
+                    <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
                       <button
                         onClick={() => handleNavClick(item.url)}
                         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
@@ -96,10 +107,10 @@ export function AppSidebar() {
                           className={`flex-shrink-0 ${active ? "text-primary" : ""}`}
                         />
                         {!collapsed && (
-                          <span className="font-medium flex-1 text-left">{item.title}</span>
+                          <span className="font-medium flex-1 text-left truncate">{item.title}</span>
                         )}
                         {!collapsed && badgeCount > 0 && (
-                          <span className="badge-info text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                          <span className="badge-info text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center flex-shrink-0">
                             {badgeCount}
                           </span>
                         )}
@@ -113,9 +124,17 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Footer status */}
-      {!collapsed && (
-        <SidebarFooter className="px-4 py-3 border-t border-sidebar-border">
+      {/* Footer: expand button (when collapsed) + status */}
+      <SidebarFooter className="px-3 py-3 border-t border-sidebar-border">
+        {collapsed ? (
+          <button
+            onClick={toggleSidebar}
+            className="w-full flex items-center justify-center text-foreground-subtle hover:text-foreground transition-colors p-1 rounded hidden md:flex"
+            title="Expand sidebar"
+          >
+            <ChevronRight size={14} />
+          </button>
+        ) : (
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
               <span
@@ -124,7 +143,7 @@ export function AppSidebar() {
                 }`}
               />
               <span className="text-[10px] text-foreground-muted truncate">
-                {isLoading ? "Fetching..." : CHAIN_LABELS[chain]}
+                {isLoading ? "Fetching…" : CHAIN_LABELS[chain]}
               </span>
             </div>
             {lastRefreshed && (
@@ -133,8 +152,8 @@ export function AppSidebar() {
               </p>
             )}
           </div>
-        </SidebarFooter>
-      )}
+        )}
+      </SidebarFooter>
     </Sidebar>
   );
 }
