@@ -1,8 +1,9 @@
 /**
- * AgentLens — Agent Leaderboard Page
- * Sortable, filterable table of all tracked agents
+ * AgentPulse — Agent Leaderboard Page
+ * Sortable, filterable table. Click any row → Agent Profile.
  */
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { CHAIN_LABELS, FRAMEWORKS, shortAddress, type SupportedChain } from "@/lib/agents";
 import { exportToCsv } from "@/lib/exportCsv";
@@ -24,6 +25,10 @@ import {
   ExternalLink,
   Search,
   SlidersHorizontal,
+  Star,
+  StarOff,
+  Share2,
+  ChevronRight,
 } from "lucide-react";
 
 type SortKey =
@@ -36,10 +41,10 @@ type SortKey =
 type SortDir = "asc" | "desc";
 
 const CHAINS_FILTER = ["all", "base-mainnet", "eth-mainnet", "avalanche-mainnet"] as const;
-const TIME_RANGES = ["All Time", "24h", "7d"] as const;
 
 export default function AgentLeaderboard() {
-  const { metricsMap, isLoading, chain } = useApp();
+  const { metricsMap, isLoading, chain, isTracked, trackAgent, untrackAgent } = useApp();
+  const navigate = useNavigate();
   const metrics = Object.values(metricsMap);
 
   const [sortKey, setSortKey] = useState<SortKey>("txCount");
@@ -48,6 +53,7 @@ export default function AgentLeaderboard() {
   const [frameworkFilter, setFrameworkFilter] = useState<string>("all");
   const [minSuccessRate, setMinSuccessRate] = useState(0);
   const [search, setSearch] = useState("");
+  const [copiedShare, setCopiedShare] = useState<string | null>(null);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -60,40 +66,50 @@ export default function AgentLeaderboard() {
 
   const filtered = useMemo(() => {
     let data = [...metrics];
-
     if (chainFilter !== "all") data = data.filter((m) => m.chain === chainFilter);
     if (frameworkFilter !== "all") data = data.filter((m) => m.framework === frameworkFilter);
     if (minSuccessRate > 0) data = data.filter((m) => m.successRate >= minSuccessRate);
     if (search.trim()) {
       const q = search.toLowerCase();
       data = data.filter(
-        (m) =>
-          m.name.toLowerCase().includes(q) ||
-          m.address.toLowerCase().includes(q),
+        (m) => m.name.toLowerCase().includes(q) || m.address.toLowerCase().includes(q),
       );
     }
-
     data.sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
       const cmp =
-        typeof av === "string"
-          ? av.localeCompare(bv as string)
-          : (av as number) - (bv as number);
+        typeof av === "string" ? av.localeCompare(bv as string) : (av as number) - (bv as number);
       return sortDir === "asc" ? cmp : -cmp;
     });
-
     return data;
   }, [metrics, chainFilter, frameworkFilter, minSuccessRate, search, sortKey, sortDir]);
 
   const SortIcon = ({ col }: { col: SortKey }) =>
     sortKey !== col ? (
-      <ArrowUpDown size={11} className="ml-1 opacity-40" />
+      <ArrowUpDown size={10} className="ml-1 opacity-40" />
     ) : sortDir === "desc" ? (
-      <ArrowDown size={11} className="ml-1 text-primary" />
+      <ArrowDown size={10} className="ml-1 text-primary" />
     ) : (
-      <ArrowUp size={11} className="ml-1 text-primary" />
+      <ArrowUp size={10} className="ml-1 text-primary" />
     );
+
+  const handleShare = (address: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}/agent/${address}`;
+    navigator.clipboard.writeText(url);
+    setCopiedShare(address);
+    setTimeout(() => setCopiedShare(null), 2000);
+  };
+
+  const handleTrackToggle = (m: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isTracked(m.address)) {
+      untrackAgent(m.address);
+    } else {
+      trackAgent({ address: m.address, name: m.name, chain: m.chain, addedAt: Date.now() });
+    }
+  };
 
   const handleExport = () => {
     exportToCsv(
@@ -116,11 +132,11 @@ export default function AgentLeaderboard() {
   };
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 space-y-6 animate-fade-in">
       <div>
         <h1 className="text-xl font-bold text-foreground">Agent Leaderboard</h1>
         <p className="text-sm text-foreground-muted mt-1">
-          {filtered.length} agents sorted by {sortKey} · {CHAIN_LABELS[chain as SupportedChain] ?? "All Chains"}
+          {filtered.length} agents · Click any row to view full profile
         </p>
       </div>
 
@@ -129,9 +145,7 @@ export default function AgentLeaderboard() {
         <div className="flex items-center gap-2 text-xs text-foreground-muted font-medium">
           <SlidersHorizontal size={12} /> Filters
         </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Search */}
           <div className="relative">
             <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
             <Input
@@ -141,8 +155,6 @@ export default function AgentLeaderboard() {
               className="pl-7 bg-background-input border-border text-xs h-8"
             />
           </div>
-
-          {/* Chain filter */}
           <Select value={chainFilter} onValueChange={setChainFilter}>
             <SelectTrigger className="bg-background-input border-border text-xs h-8">
               <SelectValue placeholder="Chain" />
@@ -150,14 +162,10 @@ export default function AgentLeaderboard() {
             <SelectContent className="bg-popover border-border text-xs">
               <SelectItem value="all">All Chains</SelectItem>
               {CHAINS_FILTER.slice(1).map((c) => (
-                <SelectItem key={c} value={c}>
-                  {CHAIN_LABELS[c as SupportedChain]}
-                </SelectItem>
+                <SelectItem key={c} value={c}>{CHAIN_LABELS[c as SupportedChain]}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-
-          {/* Framework filter */}
           <Select value={frameworkFilter} onValueChange={setFrameworkFilter}>
             <SelectTrigger className="bg-background-input border-border text-xs h-8">
               <SelectValue placeholder="Framework" />
@@ -165,18 +173,12 @@ export default function AgentLeaderboard() {
             <SelectContent className="bg-popover border-border text-xs">
               <SelectItem value="all">All Frameworks</SelectItem>
               {FRAMEWORKS.map((f) => (
-                <SelectItem key={f} value={f}>
-                  {f}
-                </SelectItem>
+                <SelectItem key={f} value={f}>{f}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-
-          {/* Min success rate */}
           <div className="space-y-1">
-            <p className="text-[10px] text-foreground-muted">
-              Min Success Rate: {minSuccessRate}%
-            </p>
+            <p className="text-[10px] text-foreground-muted">Min Success Rate: {minSuccessRate}%</p>
             <Slider
               value={[minSuccessRate]}
               min={0}
@@ -192,9 +194,7 @@ export default function AgentLeaderboard() {
       {/* Table */}
       <div className="card-glow rounded-xl bg-background-card p-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-foreground-muted">
-            {filtered.length} agents
-          </p>
+          <p className="text-xs text-foreground-muted">{filtered.length} agents</p>
           <Button
             variant="ghost"
             size="sm"
@@ -213,98 +213,124 @@ export default function AgentLeaderboard() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12 text-sm text-foreground-muted">
-            No agents match your filters — try adjusting them or add an API key.
+            No agents match your filters.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border text-foreground-muted">
-                  <th className="text-left pb-2 font-medium">#</th>
-                  <SortHeader label="Agent" col="name" sortKey={sortKey} onClick={() => handleSort("name")}>
-                    <SortIcon col="name" />
-                  </SortHeader>
-                  <SortHeader label="Chain" col={null} sortKey={sortKey} onClick={() => {}}>
-                    <></>
-                  </SortHeader>
-                  <SortHeader label="Framework" col={null} sortKey={sortKey} onClick={() => {}}>
-                    <></>
-                  </SortHeader>
-                  <SortHeader label="Tx Count" col="txCount" sortKey={sortKey} onClick={() => handleSort("txCount")}>
-                    <SortIcon col="txCount" />
-                  </SortHeader>
-                  <SortHeader label="Success %" col="successRate" sortKey={sortKey} onClick={() => handleSort("successRate")}>
-                    <SortIcon col="successRate" />
-                  </SortHeader>
-                  <SortHeader label="Avg Gas $" col="avgGasUsd" sortKey={sortKey} onClick={() => handleSort("avgGasUsd")}>
-                    <SortIcon col="avgGasUsd" />
-                  </SortHeader>
-                  <SortHeader label="Failures" col="failCount" sortKey={sortKey} onClick={() => handleSort("failCount")}>
-                    <SortIcon col="failCount" />
-                  </SortHeader>
-                  <SortHeader label="24h Txs" col="last24hTxCount" sortKey={sortKey} onClick={() => handleSort("last24hTxCount")}>
-                    <SortIcon col="last24hTxCount" />
-                  </SortHeader>
-                  <th className="text-right pb-2 font-medium">Links</th>
+                  <th className="text-left pb-2 font-medium w-6">#</th>
+                  <th
+                    className="text-left pb-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => handleSort("name")}
+                  >
+                    <span className="inline-flex items-center">Agent <SortIcon col="name" /></span>
+                  </th>
+                  <th className="text-left pb-2 font-medium hidden md:table-cell">Chain</th>
+                  <th className="text-left pb-2 font-medium hidden lg:table-cell">Framework</th>
+                  <th
+                    className="text-right pb-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => handleSort("txCount")}
+                  >
+                    <span className="inline-flex items-center justify-end">Txs <SortIcon col="txCount" /></span>
+                  </th>
+                  <th
+                    className="text-right pb-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => handleSort("successRate")}
+                  >
+                    <span className="inline-flex items-center justify-end">Success % <SortIcon col="successRate" /></span>
+                  </th>
+                  <th
+                    className="text-right pb-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors hidden sm:table-cell"
+                    onClick={() => handleSort("avgGasUsd")}
+                  >
+                    <span className="inline-flex items-center justify-end">Avg Gas $ <SortIcon col="avgGasUsd" /></span>
+                  </th>
+                  <th
+                    className="text-right pb-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors hidden sm:table-cell"
+                    onClick={() => handleSort("failCount")}
+                  >
+                    <span className="inline-flex items-center justify-end">Fails <SortIcon col="failCount" /></span>
+                  </th>
+                  <th className="text-right pb-2 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((agent, idx) => {
+                  const tracked = isTracked(agent.address);
                   return (
-                    <tr key={agent.address} className="border-b border-border/40 table-row-hover">
+                    <tr
+                      key={agent.address}
+                      className="border-b border-border/40 table-row-hover cursor-pointer group"
+                      onClick={() => navigate(`/agent/${agent.address}`)}
+                    >
                       <td className="py-3 pr-2 text-foreground-subtle">{idx + 1}</td>
-                      <td className="py-3 pr-4 min-w-[160px]">
+                      <td className="py-3 pr-4 min-w-[140px]">
                         <div>
-                          <p className="font-semibold text-foreground">{agent.name}</p>
+                          <p className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                            {agent.name}
+                          </p>
                           <p className="text-foreground-subtle font-mono text-[10px]">
                             {shortAddress(agent.address)}
                           </p>
                         </div>
                       </td>
-                      <td className="py-3 pr-3">
+                      <td className="py-3 pr-3 hidden md:table-cell">
                         <span className="badge-info px-1.5 py-0.5 rounded text-[10px]">
                           {CHAIN_LABELS[agent.chain as SupportedChain]}
                         </span>
                       </td>
-                      <td className="py-3 pr-3">
-                        <span className="text-foreground-muted">{agent.framework}</span>
+                      <td className="py-3 pr-3 hidden lg:table-cell">
+                        <span className="text-foreground-muted text-[10px]">{agent.framework}</span>
                       </td>
                       <td className="py-3 pr-3 text-right text-foreground font-medium">
                         {agent.txCount.toLocaleString()}
                       </td>
                       <td className="py-3 pr-3 text-right">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                            agent.successRate >= 90
-                              ? "badge-success"
-                              : agent.successRate >= 70
-                              ? "badge-warning"
-                              : "badge-error"
-                          }`}
-                        >
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                          agent.successRate >= 90 ? "badge-success" : agent.successRate >= 70 ? "badge-warning" : "badge-error"
+                        }`}>
                           {agent.successRate.toFixed(1)}%
                         </span>
                       </td>
-                      <td className="py-3 pr-3 text-right text-foreground-muted">
+                      <td className="py-3 pr-3 text-right text-foreground-muted hidden sm:table-cell">
                         {agent.avgGasUsd > 0 ? `$${agent.avgGasUsd.toFixed(4)}` : "—"}
                       </td>
-                      <td className="py-3 pr-3 text-right text-destructive">
+                      <td className="py-3 pr-3 text-right text-destructive hidden sm:table-cell">
                         {agent.failCount}
                       </td>
-                      <td className="py-3 pr-3 text-right text-foreground-muted">
-                        {agent.last24hTxCount}
-                      </td>
                       <td className="py-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => handleTrackToggle(agent, e)}
+                            className={`p-1.5 rounded hover:bg-accent transition-colors ${tracked ? "text-warning" : "text-foreground-subtle hover:text-warning"}`}
+                            title={tracked ? "Remove from watchlist" : "Add to watchlist"}
+                          >
+                            {tracked ? <StarOff size={12} /> : <Star size={12} />}
+                          </button>
+                          <button
+                            onClick={(e) => handleShare(agent.address, e)}
+                            className="p-1.5 rounded hover:bg-accent transition-colors text-foreground-subtle hover:text-primary"
+                            title="Copy share link"
+                          >
+                            {copiedShare === agent.address ? (
+                              <span className="text-[9px] text-success">✓</span>
+                            ) : (
+                              <Share2 size={12} />
+                            )}
+                          </button>
                           <a
                             href={`https://8004agents.ai/agent/${agent.address}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title="8004agents.ai"
-                            className="text-foreground-subtle hover:text-primary transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded hover:bg-accent transition-colors text-foreground-subtle hover:text-primary"
+                            title="View on 8004agents.ai"
                           >
-                            <ExternalLink size={11} />
+                            <ExternalLink size={12} />
                           </a>
+                          <ChevronRight size={12} className="text-foreground-subtle group-hover:text-primary transition-colors" />
                         </div>
                       </td>
                     </tr>
@@ -316,31 +342,5 @@ export default function AgentLeaderboard() {
         )}
       </div>
     </div>
-  );
-}
-
-function SortHeader({
-  label,
-  col,
-  sortKey,
-  onClick,
-  children,
-}: {
-  label: string;
-  col: SortKey | null;
-  sortKey: SortKey;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <th
-      className={`pb-2 font-medium text-right ${col ? "cursor-pointer select-none hover:text-foreground transition-colors" : ""}`}
-      onClick={onClick}
-    >
-      <span className="inline-flex items-center justify-end">
-        {label}
-        {children}
-      </span>
-    </th>
   );
 }
