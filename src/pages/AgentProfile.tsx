@@ -1,49 +1,27 @@
 /**
- * AgentPulse — Agent Profile Page (CoinGecko-style)
- * Shows detailed analytics for any agent by address.
- * Accessible via /agent/:address or the global search bar.
+ * AgentPulse — Premium Agent Profile Page (Birdeye token page style)
+ * Hero header, animated stat grid, main chart, tabs (Overview/Performance/Failures/Txs)
  */
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { useApp } from "@/contexts/AppContext";
 import {
-  fetchTransactions,
-  computeAgentMetrics,
-  buildDailyTimeSeries,
-  buildFailureBreakdown,
-  parseFailureReason,
-  type AgentMetrics,
-  type CovalentTx,
+  fetchTransactions, computeAgentMetrics, buildDailyTimeSeries,
+  buildFailureBreakdown, parseFailureReason,
+  type AgentMetrics, type CovalentTx,
 } from "@/lib/covalent";
 import { KNOWN_AGENTS, shortAddress, CHAIN_LABELS, type SupportedChain } from "@/lib/agents";
 import { exportToCsv } from "@/lib/exportCsv";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowLeft,
-  Star,
-  StarOff,
-  ExternalLink,
-  Copy,
-  CheckCircle2,
-  Share2,
-  Download,
-  RefreshCw,
-  Zap,
-  Activity,
-  TrendingUp,
-  AlertTriangle,
+  ArrowLeft, Star, StarOff, ExternalLink, Copy, CheckCircle2,
+  Share2, Download, RefreshCw, Zap, Activity, TrendingUp,
+  AlertTriangle, Shield, Flame, Clock,
 } from "lucide-react";
 
 const CHAIN_EXPLORER: Record<string, string> = {
@@ -52,27 +30,44 @@ const CHAIN_EXPLORER: Record<string, string> = {
   "avalanche-mainnet": "https://snowtrace.io/address/",
 };
 
+const TX_EXPLORER: Record<string, string> = {
+  "base-mainnet": "https://basescan.org/tx/",
+  "eth-mainnet": "https://etherscan.io/tx/",
+  "avalanche-mainnet": "https://snowtrace.io/tx/",
+};
+
 const FAILURE_COLORS = [
-  "hsl(0,84%,60%)",
-  "hsl(38,100%,55%)",
-  "hsl(258,90%,66%)",
-  "hsl(182,100%,45%)",
-  "hsl(142,76%,48%)",
+  "hsl(0,84%,60%)", "hsl(38,100%,55%)", "hsl(220,100%,60%)",
+  "hsl(142,76%,48%)", "hsl(280,80%,65%)",
 ];
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-background-elevated border border-border rounded-lg px-3 py-2 text-xs shadow-card-elevated">
-      <p className="text-foreground-muted mb-1">{label}</p>
+    <div className="bg-background-card border border-border rounded-xl px-3.5 py-2.5 text-xs shadow-card-elevated">
+      <p className="text-foreground-muted mb-1 font-medium">{label}</p>
       {payload.map((p: any) => (
-        <p key={p.dataKey} style={{ color: p.color || p.fill }}>
+        <p key={p.dataKey} className="font-semibold" style={{ color: p.color || p.fill }}>
           {p.name}: {typeof p.value === "number" ? p.value.toFixed(2) : p.value}
-          {p.name?.includes("Rate") || p.name?.includes("%") ? "%" : ""}
+          {p.name?.includes("Rate") ? "%" : ""}
         </p>
       ))}
     </div>
   );
+};
+
+const TABS = ["Overview", "Performance", "Failures", "Transactions"] as const;
+type Tab = typeof TABS[number];
+
+const DEBUG_TIPS: Record<string, string> = {
+  "Slippage Exceeded": "Increase slippage tolerance (0.5% → 1–3%) or use limit orders. Check liquidity depth.",
+  "Gas Limit Exceeded": "Increase gas limit by 20–30%. Complex DeFi ops need ≥500k gas. Consider gas estimation.",
+  "Execution Reverted": "Transaction logic failed. Check contract state, token balances, and approval amounts.",
+  "Insufficient Balance": "Ensure wallet holds enough tokens + gas. Check for pending txs consuming balance.",
+  "Nonce Too Low": "Nonce conflict — wait for pending txs to clear or reset nonce in wallet settings.",
+  "Deadline Exceeded": "Transaction too slow — increase deadline window (300s → 600s) or boost gas price.",
+  "Access Denied": "Caller lacks required role or allowance. Verify permissions and approvals.",
+  "Unknown Revert": "Check contract source code. Use Tenderly to trace the exact revert reason.",
 };
 
 export default function AgentProfile() {
@@ -85,413 +80,476 @@ export default function AgentProfile() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("Overview");
   const [profileChain, setProfileChain] = useState<SupportedChain>(chain);
 
-  // Look up known agent info
-  const knownAgent = KNOWN_AGENTS.find(
-    (a) => a.address.toLowerCase() === address?.toLowerCase(),
-  );
-
+  const knownAgent = KNOWN_AGENTS.find(a => a.address.toLowerCase() === address?.toLowerCase());
   const agentName = knownAgent?.name ?? `Agent ${shortAddress(address ?? "")}`;
   const tracked = isTracked(address ?? "");
 
-  // Fetch txs when address or chain changes
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!address) return;
     setIsLoading(true);
     setError(null);
-    fetchTransactions(profileChain, address, apiKey, 100)
-      .then((data) => {
-        setTxs(data);
-        const agentInfo = knownAgent ?? {
-          address,
-          name: agentName,
-          chain: profileChain,
-          framework: "Unknown" as const,
-        };
-        setMetrics(computeAgentMetrics(agentInfo, data));
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setIsLoading(false));
-  }, [address, profileChain, apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    try {
+      const data = await fetchTransactions(profileChain, address, apiKey, 100);
+      setTxs(data);
+      const info = knownAgent ?? { address, name: agentName, chain: profileChain, framework: "Unknown" as const };
+      setMetrics(computeAgentMetrics(info, data));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [address, profileChain, apiKey]); // eslint-disable-line
+
+  useEffect(() => { loadData(); }, [address, profileChain]); // eslint-disable-line
 
   const timeSeries = useMemo(() => buildDailyTimeSeries(txs, 14), [txs]);
   const failureBreakdown = useMemo(() => buildFailureBreakdown(txs), [txs]);
+  const failedTxs = useMemo(() => txs.filter(t => !t.successful), [txs]);
 
-  const failedTxs = useMemo(
-    () => txs.filter((t) => !t.successful).slice(0, 20),
-    [txs],
-  );
-
-  const handleCopyAddress = () => {
-    if (address) {
-      navigator.clipboard.writeText(address);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleShare = () => {
-    const url = `${window.location.origin}/agent/${address}`;
-    navigator.clipboard.writeText(url);
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleTrack = () => {
-    if (!address) return;
-    if (tracked) {
-      untrackAgent(address);
-    } else {
-      trackAgent({
-        address,
-        name: agentName,
-        chain: profileChain,
-        addedAt: Date.now(),
-      });
-    }
-  };
+  if (!address) return (
+    <div className="p-6 text-center text-foreground-muted">No agent address provided.</div>
+  );
 
-  const handleExport = () => {
-    exportToCsv(
-      txs.map((t) => ({
-        tx_hash: t.tx_hash,
-        block_signed_at: t.block_signed_at,
-        successful: t.successful,
-        gas_spent: t.gas_spent,
-        gas_quote_usd: t.gas_quote,
-        failure_reason: t.successful ? "" : parseFailureReason(t),
-      })),
-      `agent_${address?.slice(0, 8)}`,
-    );
-  };
-
-  if (!address) {
-    return (
-      <div className="p-6 text-center text-foreground-muted">
-        No agent address provided.
-      </div>
-    );
-  }
+  const successColor = metrics
+    ? metrics.successRate >= 90 ? "text-success" : metrics.successRate >= 70 ? "text-warning" : "text-destructive"
+    : "text-foreground-muted";
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 animate-fade-in max-w-6xl mx-auto">
-      {/* Back button */}
-      <button
-        onClick={() => navigate(-1)}
-        className="flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground transition-colors"
-      >
-        <ArrowLeft size={13} /> Back
-      </button>
+    <div className="animate-fade-in max-w-6xl mx-auto">
+      {/* Back nav */}
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6">
+        <button onClick={() => navigate(-1)}
+          className="flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground transition-colors mb-5 group">
+          <ArrowLeft size={13} className="group-hover:-translate-x-0.5 transition-transform" /> Back
+        </button>
+      </div>
 
-      {/* Agent header */}
-      <div className="card-glow rounded-xl bg-background-card p-5">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          {/* Avatar */}
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/20 flex items-center justify-center flex-shrink-0 shadow-neon-sm">
-            <Zap size={22} className="text-primary" />
-          </div>
+      {/* Hero header */}
+      <div className="px-4 sm:px-6 pb-6">
+        <div className="relative rounded-2xl border border-border overflow-hidden"
+          style={{ background: "linear-gradient(135deg, hsl(0 0% 7%) 0%, hsl(0 0% 6%) 100%)" }}>
+          <div className="absolute inset-0 bg-hero-glow opacity-60" />
+          <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-primary/4 blur-3xl" />
 
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h1 className="text-xl font-bold text-foreground">{agentName}</h1>
-              {knownAgent && (
-                <span className="badge-info text-[10px] px-2 py-0.5 rounded-full">
-                  {knownAgent.framework}
-                </span>
-              )}
+          <div className="relative z-10 p-5 sm:p-7">
+            <div className="flex flex-col sm:flex-row items-start gap-5">
+              {/* Avatar */}
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-primary/25 to-primary/10 border border-primary/25 flex items-center justify-center flex-shrink-0 shadow-neon-sm">
+                <Zap size={28} className="text-primary" />
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                  <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">{agentName}</h1>
+                  {knownAgent && (
+                    <span className="badge-info text-[10px] px-2.5 py-1 rounded-full font-semibold">
+                      {knownAgent.framework}
+                    </span>
+                  )}
+                  {metrics && (
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                      metrics.successRate >= 90 ? "badge-success" : metrics.successRate >= 70 ? "badge-warning" : "badge-error"
+                    }`}>
+                      {metrics.successRate.toFixed(1)}% success
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-mono text-foreground-muted truncate max-w-xs">{address}</span>
+                  <button onClick={() => copyToClipboard(address)}
+                    className="text-foreground-subtle hover:text-primary transition-colors p-1 rounded-md hover:bg-primary/10">
+                    {copied ? <CheckCircle2 size={12} className="text-primary" /> : <Copy size={12} />}
+                  </button>
+                </div>
+                {knownAgent?.description && (
+                  <p className="text-xs text-foreground-muted mt-2 max-w-lg">{knownAgent.description}</p>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                {/* Chain selector */}
+                <div className="flex gap-1 p-1 bg-background-elevated rounded-xl border border-border">
+                  {(["base-mainnet", "eth-mainnet", "avalanche-mainnet"] as SupportedChain[]).map(c => (
+                    <button key={c} onClick={() => setProfileChain(c)}
+                      className={`px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${
+                        profileChain === c
+                          ? "bg-primary/15 border border-primary/40 text-primary"
+                          : "text-foreground-muted hover:text-foreground"
+                      }`}>
+                      {CHAIN_LABELS[c]}
+                    </button>
+                  ))}
+                </div>
+
+                <Button variant="outline" size="sm" onClick={() => {
+                  if (!address) return;
+                  tracked
+                    ? untrackAgent(address)
+                    : trackAgent({ address, name: agentName, chain: profileChain, addedAt: Date.now() });
+                }} className={`gap-2 h-9 text-xs rounded-xl border transition-all ${
+                  tracked ? "border-warning/40 text-warning hover:bg-warning/10" : "border-border text-foreground-muted hover:border-primary/40 hover:text-primary"
+                }`}>
+                  {tracked ? <StarOff size={12} /> : <Star size={12} />}
+                  {tracked ? "Untrack" : "Track Agent"}
+                </Button>
+
+                <Button variant="outline" size="sm" onClick={() => copyToClipboard(`${window.location.origin}/agent/${address}`)}
+                  className="gap-2 h-9 text-xs border-border text-foreground-muted hover:border-primary/40 rounded-xl">
+                  <Share2 size={12} /> Share
+                </Button>
+
+                {CHAIN_EXPLORER[profileChain] && (
+                  <a href={`${CHAIN_EXPLORER[profileChain]}${address}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs border border-border text-foreground-muted hover:border-primary/40 hover:text-primary transition-all">
+                    Explorer <ExternalLink size={10} />
+                  </a>
+                )}
+
+                <Button variant="ghost" size="sm" onClick={loadData} disabled={isLoading}
+                  className="h-9 w-9 p-0 hover:bg-accent/50 rounded-xl">
+                  <RefreshCw size={13} className={isLoading ? "animate-spin text-primary" : "text-foreground-muted"} />
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-mono text-foreground-muted">{address}</span>
-              <button onClick={handleCopyAddress} className="text-foreground-subtle hover:text-primary transition-colors">
-                {copied ? <CheckCircle2 size={12} /> : <Copy size={12} />}
-              </button>
-            </div>
-            {knownAgent?.description && (
-              <p className="text-xs text-foreground-muted mt-1.5">{knownAgent.description}</p>
-            )}
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-            {/* Chain selector */}
-            <div className="flex gap-1">
-              {(["base-mainnet", "eth-mainnet", "avalanche-mainnet"] as SupportedChain[]).map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setProfileChain(c)}
-                  className={`px-2 py-1 rounded text-[10px] border transition-all ${
-                    profileChain === c
-                      ? "bg-primary/10 border-primary/50 text-primary"
-                      : "border-border text-foreground-muted hover:border-border-accent"
-                  }`}
-                >
-                  {CHAIN_LABELS[c]}
-                </button>
-              ))}
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleTrack}
-              className={`gap-1.5 h-8 text-xs border transition-all ${
-                tracked
-                  ? "border-warning/40 text-warning hover:bg-warning/10"
-                  : "border-border text-foreground-muted hover:border-primary/40 hover:text-primary"
-              }`}
-            >
-              {tracked ? <StarOff size={12} /> : <Star size={12} />}
-              {tracked ? "Untrack" : "Track Agent"}
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleShare}
-              className="gap-1.5 h-8 text-xs border-border text-foreground-muted hover:border-primary/40"
-            >
-              <Share2 size={12} />
-              Share
-            </Button>
-
-            {CHAIN_EXPLORER[profileChain] && (
-              <a
-                href={`${CHAIN_EXPLORER[profileChain]}${address}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 h-8 px-3 rounded-md text-xs border border-border text-foreground-muted hover:border-primary/40 hover:text-primary transition-all"
-              >
-                Explorer <ExternalLink size={10} />
-              </a>
-            )}
           </div>
         </div>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-destructive-dim border border-destructive/30 rounded-xl text-xs text-destructive">
+        <div className="mx-4 sm:mx-6 mb-4 flex items-center gap-2 px-4 py-3 bg-destructive/8 border border-destructive/25 rounded-xl text-xs text-destructive">
           <AlertTriangle size={12} />
           {error}
         </div>
       )}
 
-      {/* KPI row */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-24 bg-background-card rounded-xl animate-shimmer bg-[length:200%_100%] card-glow" />
+      {/* KPI Stats */}
+      <div className="px-4 sm:px-6 mb-6">
+        {isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-28 card-glass border border-border rounded-2xl animate-shimmer" />
+            ))}
+          </div>
+        ) : metrics ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { label: "Total Txs", value: metrics.txCount.toLocaleString(), icon: <Activity size={14} className="text-primary" />, accent: "text-primary" },
+              { label: "Success Rate", value: `${metrics.successRate.toFixed(1)}%`, icon: <Shield size={14} className={successColor} />, accent: successColor },
+              { label: "Avg Gas USD", value: metrics.avgGasUsd > 0 ? `$${metrics.avgGasUsd.toFixed(4)}` : "—", icon: <Zap size={14} className="text-warning" />, accent: "text-warning" },
+              { label: "24h Txs", value: metrics.last24hTxCount.toString(), icon: <Clock size={14} className="text-secondary" />, accent: "text-secondary" },
+            ].map((s, i) => (
+              <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
+                className="card-glass rounded-2xl border border-border p-5 hover:border-border-accent/40 transition-all">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] uppercase tracking-widest text-foreground-subtle font-semibold">{s.label}</p>
+                  <div className="w-8 h-8 rounded-lg bg-background-elevated border border-border flex items-center justify-center">{s.icon}</div>
+                </div>
+                <p className={`text-2xl sm:text-3xl font-black tracking-tight num-ticker ${s.accent}`}>{s.value}</p>
+              </motion.div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Tabs */}
+      <div className="px-4 sm:px-6 mb-5">
+        <div className="flex gap-1 p-1 bg-background-elevated rounded-xl border border-border w-fit">
+          {TABS.map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                activeTab === tab
+                  ? "bg-background-card text-foreground border border-border shadow-sm"
+                  : "text-foreground-muted hover:text-foreground"
+              }`}>
+              {tab}
+            </button>
           ))}
         </div>
-      ) : metrics ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <StatCard
-            label="Total Txs"
-            value={metrics.txCount.toLocaleString()}
-            icon={<Activity size={13} className="text-primary" />}
-            accent="primary"
-          />
-          <StatCard
-            label="Success Rate"
-            value={`${metrics.successRate.toFixed(1)}%`}
-            icon={<CheckCircle2 size={13} className="text-success" />}
-            accent={metrics.successRate >= 90 ? "success" : metrics.successRate >= 70 ? "warning" : "destructive"}
-          />
-          <StatCard
-            label="Avg Gas (USD)"
-            value={metrics.avgGasUsd > 0 ? `$${metrics.avgGasUsd.toFixed(4)}` : "—"}
-            icon={<Zap size={13} className="text-warning" />}
-            accent="warning"
-          />
-          <StatCard
-            label="24h Txs"
-            value={metrics.last24hTxCount.toString()}
-            icon={<TrendingUp size={13} className="text-secondary" />}
-            accent="secondary"
-          />
-        </div>
-      ) : null}
+      </div>
 
-      {/* Charts row */}
-      {!isLoading && txs.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Success rate over time */}
-          <div className="card-glow rounded-xl bg-background-card p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-1">
-              Success Rate — 14 Day Trend
-            </h3>
-            <p className="text-xs text-foreground-muted mb-4">Daily % of successful transactions</p>
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={timeSeries} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                <defs>
-                  <linearGradient id="ag-successGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(182,100%,45%)" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="hsl(182,100%,45%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(224,24%,14%)" />
-                <XAxis dataKey="date" tick={{ fontSize: 9, fill: "hsl(215,20%,50%)" }} tickLine={false} axisLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "hsl(215,20%,50%)" }} tickLine={false} axisLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="successRate" name="Success Rate %" stroke="hsl(182,100%,45%)" strokeWidth={2} fill="url(#ag-successGrad)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Failure breakdown */}
-          {failureBreakdown.length > 0 ? (
-            <div className="card-glow rounded-xl bg-background-card p-5">
-              <h3 className="text-sm font-semibold text-foreground mb-1">Failure Breakdown</h3>
-              <p className="text-xs text-foreground-muted mb-4">Failures by revert reason</p>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={failureBreakdown} layout="vertical" margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(224,24%,14%)" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 9, fill: "hsl(215,20%,50%)" }} tickLine={false} axisLine={false} />
-                  <YAxis type="category" dataKey="reason" tick={{ fontSize: 8, fill: "hsl(215,20%,55%)" }} tickLine={false} axisLine={false} width={100} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="count" name="Count" radius={[0, 4, 4, 0]}>
-                    {failureBreakdown.map((_, i) => (
-                      <Cell key={i} fill={FAILURE_COLORS[i % FAILURE_COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="card-glow rounded-xl bg-background-card p-5 flex items-center justify-center">
-              <div className="text-center">
-                <CheckCircle2 size={28} className="text-success mx-auto mb-2" />
-                <p className="text-sm font-medium text-foreground">No failures detected</p>
-                <p className="text-xs text-foreground-muted mt-1">All recent transactions succeeded</p>
+      {/* Tab content */}
+      <div className="px-4 sm:px-6 pb-8">
+        <AnimatePresence mode="wait">
+          {activeTab === "Overview" && (
+            <motion.div key="overview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Success rate chart */}
+              <div className="card-glass rounded-2xl border border-border p-5 sm:p-6">
+                <h3 className="text-sm font-bold text-foreground mb-1">Success Rate — 14 Day</h3>
+                <p className="text-xs text-foreground-muted mb-5">Daily % of successful transactions</p>
+                {isLoading ? <div className="h-48 bg-background-elevated rounded-xl animate-shimmer" /> :
+                  txs.length === 0 ? <EmptyChart /> : (
+                    <ResponsiveContainer width="100%" height={190}>
+                      <AreaChart data={timeSeries} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                        <defs>
+                          <linearGradient id="ag-sg" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(142,76%,48%)" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="hsl(142,76%,48%)" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,12%)" />
+                        <XAxis dataKey="date" tick={{ fontSize: 9, fill: "hsl(0,0%,45%)" }} tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "hsl(0,0%,45%)" }} tickLine={false} axisLine={false} />
+                        <Tooltip content={<ChartTooltip />} />
+                        <Area type="monotone" dataKey="successRate" name="Success Rate %" stroke="hsl(142,76%,48%)" strokeWidth={2.5} fill="url(#ag-sg)" dot={false} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
               </div>
-            </div>
+
+              {/* Failure pie */}
+              {failureBreakdown.length > 0 ? (
+                <div className="card-glass rounded-2xl border border-border p-5 sm:p-6">
+                  <h3 className="text-sm font-bold text-foreground mb-1">Failure Breakdown</h3>
+                  <p className="text-xs text-foreground-muted mb-5">By revert reason</p>
+                  {isLoading ? <div className="h-48 bg-background-elevated rounded-xl animate-shimmer" /> : (
+                    <div className="flex items-center gap-4">
+                      <ResponsiveContainer width={140} height={140}>
+                        <PieChart>
+                          <Pie data={failureBreakdown} cx="50%" cy="50%" innerRadius={38} outerRadius={58}
+                            dataKey="count" paddingAngle={2}>
+                            {failureBreakdown.map((_, i) => (
+                              <Cell key={i} fill={FAILURE_COLORS[i % FAILURE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(v, n) => [v, n]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="flex-1 space-y-1.5">
+                        {failureBreakdown.slice(0, 5).map((f, i) => (
+                          <div key={f.reason} className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: FAILURE_COLORS[i % FAILURE_COLORS.length] }} />
+                            <span className="text-[10px] text-foreground-muted flex-1 truncate">{f.reason}</span>
+                            <span className="text-[10px] font-bold text-foreground">{f.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="card-glass rounded-2xl border border-border p-5 sm:p-6 flex items-center justify-center">
+                  <div className="text-center space-y-2">
+                    <CheckCircle2 size={32} className="text-primary mx-auto" />
+                    <p className="text-sm font-bold text-foreground">Perfect execution</p>
+                    <p className="text-xs text-foreground-muted">No failures in recent transactions</p>
+                  </div>
+                </div>
+              )}
+            </motion.div>
           )}
-        </div>
-      )}
 
-      {/* Recent transactions */}
-      {!isLoading && txs.length > 0 && (
-        <div className="card-glow rounded-xl bg-background-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Recent Transactions</h3>
-              <p className="text-xs text-foreground-muted mt-0.5">Last {txs.slice(0, 20).length} transactions</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleExport}
-              className="text-foreground-muted gap-1.5 h-7 text-xs"
-            >
-              <Download size={11} /> Export CSV
-            </Button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border text-foreground-muted">
-                  <th className="text-left pb-2 font-medium">Time</th>
-                  <th className="text-left pb-2 font-medium hidden sm:table-cell">Tx Hash</th>
-                  <th className="text-center pb-2 font-medium">Status</th>
-                  <th className="text-right pb-2 font-medium">Gas USD</th>
-                  <th className="text-left pb-2 font-medium">Reason</th>
-                  <th className="text-right pb-2 font-medium">View</th>
-                </tr>
-              </thead>
-              <tbody>
-                {txs.slice(0, 20).map((tx) => {
-                  const explorerUrl = `${CHAIN_EXPLORER[profileChain] ?? ""}${tx.tx_hash}`;
-                  return (
-                    <tr key={tx.tx_hash} className="border-b border-border/40 table-row-hover">
-                      <td className="py-2.5 pr-3 text-foreground-muted whitespace-nowrap">
-                        {new Date(tx.block_signed_at).toLocaleString(undefined, {
-                          month: "short", day: "numeric",
-                          hour: "2-digit", minute: "2-digit",
-                        })}
-                      </td>
-                      <td className="py-2.5 pr-3 hidden sm:table-cell">
-                        <span className="font-mono text-foreground-subtle">{shortAddress(tx.tx_hash)}</span>
-                      </td>
-                      <td className="py-2.5 pr-3 text-center">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${tx.successful ? "badge-success" : "badge-error"}`}>
-                          {tx.successful ? "✓" : "✗"}
-                        </span>
-                      </td>
-                      <td className="py-2.5 pr-3 text-right text-foreground-muted">
-                        {tx.gas_quote > 0 ? `$${tx.gas_quote.toFixed(4)}` : "—"}
-                      </td>
-                      <td className="py-2.5 pr-3">
-                        {!tx.successful && (
-                          <span className="badge-error px-1.5 py-0.5 rounded text-[10px]">
-                            {parseFailureReason(tx)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2.5 text-right">
-                        <a
-                          href={explorerUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-foreground-subtle hover:text-primary transition-colors"
-                        >
-                          <ExternalLink size={11} />
-                        </a>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+          {activeTab === "Performance" && (
+            <motion.div key="perf" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="space-y-4">
+              {/* Tx volume + gas charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="card-glass rounded-2xl border border-border p-5 sm:p-6">
+                  <h3 className="text-sm font-bold text-foreground mb-1">Daily Tx Volume</h3>
+                  <p className="text-xs text-foreground-muted mb-5">Transactions per day</p>
+                  {isLoading ? <div className="h-48 bg-background-elevated rounded-xl animate-shimmer" /> :
+                    txs.length === 0 ? <EmptyChart /> : (
+                      <ResponsiveContainer width="100%" height={190}>
+                        <AreaChart data={timeSeries} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                          <defs>
+                            <linearGradient id="ag-vg" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="hsl(220,100%,60%)" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="hsl(220,100%,60%)" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,12%)" />
+                          <XAxis dataKey="date" tick={{ fontSize: 9, fill: "hsl(0,0%,45%)" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 9, fill: "hsl(0,0%,45%)" }} tickLine={false} axisLine={false} />
+                          <Tooltip content={<ChartTooltip />} />
+                          <Area type="monotone" dataKey="txCount" name="Txs" stroke="hsl(220,100%,60%)" strokeWidth={2} fill="url(#ag-vg)" dot={false} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    )}
+                </div>
 
-      {!isLoading && txs.length === 0 && !error && (
-        <div className="card-glow rounded-xl bg-background-card p-12 text-center">
-          <Activity size={32} className="text-foreground-subtle mx-auto mb-3" />
-          <p className="text-sm text-foreground-muted">No transactions found for this agent on {CHAIN_LABELS[profileChain]}</p>
-          <p className="text-xs text-foreground-subtle mt-1">Try switching chains above</p>
-        </div>
-      )}
+                <div className="card-glass rounded-2xl border border-border p-5 sm:p-6">
+                  <h3 className="text-sm font-bold text-foreground mb-1">Gas Efficiency</h3>
+                  <p className="text-xs text-foreground-muted mb-5">Avg gas USD per success tx</p>
+                  {isLoading ? <div className="h-48 bg-background-elevated rounded-xl animate-shimmer" /> :
+                    txs.length === 0 ? <EmptyChart /> : (
+                      <ResponsiveContainer width="100%" height={190}>
+                        <AreaChart data={timeSeries} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                          <defs>
+                            <linearGradient id="ag-gg" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="hsl(38,100%,55%)" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="hsl(38,100%,55%)" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,12%)" />
+                          <XAxis dataKey="date" tick={{ fontSize: 9, fill: "hsl(0,0%,45%)" }} tickLine={false} axisLine={false} />
+                          <YAxis tick={{ fontSize: 9, fill: "hsl(0,0%,45%)" }} tickLine={false} axisLine={false} />
+                          <Tooltip content={<ChartTooltip />} />
+                          <Area type="monotone" dataKey="gasUsd" name="Gas USD" stroke="hsl(38,100%,55%)" strokeWidth={2} fill="url(#ag-gg)" dot={false} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    )}
+                </div>
+              </div>
+            </motion.div>
+          )}
 
-      {isLoading && (
-        <div className="card-glow rounded-xl bg-background-card p-12 text-center">
-          <RefreshCw size={24} className="text-primary mx-auto mb-3 animate-spin" />
-          <p className="text-sm text-foreground-muted">Loading agent data…</p>
-        </div>
-      )}
+          {activeTab === "Failures" && (
+            <motion.div key="failures" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="space-y-4">
+              {failedTxs.length === 0 ? (
+                <div className="card-glass rounded-2xl border border-border p-16 text-center space-y-3">
+                  <CheckCircle2 size={40} className="text-primary mx-auto" />
+                  <p className="text-base font-bold text-foreground">No failures detected</p>
+                  <p className="text-sm text-foreground-muted">All recent transactions succeeded</p>
+                </div>
+              ) : (
+                <>
+                  {/* Failure chart */}
+                  {failureBreakdown.length > 0 && (
+                    <div className="card-glass rounded-2xl border border-border p-5 sm:p-6">
+                      <h3 className="text-sm font-bold text-foreground mb-5">Failure Reasons</h3>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={failureBreakdown} layout="vertical" margin={{ top: 4, right: 16, bottom: 0, left: 8 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(0,0%,12%)" horizontal={false} />
+                          <XAxis type="number" tick={{ fontSize: 9, fill: "hsl(0,0%,45%)" }} tickLine={false} axisLine={false} />
+                          <YAxis type="category" dataKey="reason" tick={{ fontSize: 8, fill: "hsl(0,0%,50%)" }} tickLine={false} axisLine={false} width={110} />
+                          <Tooltip content={<ChartTooltip />} />
+                          <Bar dataKey="count" name="Count" radius={[0, 6, 6, 0]}>
+                            {failureBreakdown.map((_, i) => (
+                              <Cell key={i} fill={FAILURE_COLORS[i % FAILURE_COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  {/* Debug tips */}
+                  <div className="card-glass rounded-2xl border border-border p-5 sm:p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Flame size={15} className="text-warning" />
+                      <h3 className="text-sm font-bold text-foreground">Debug Tips</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {failureBreakdown.map((f, i) => (
+                        <div key={f.reason} className="flex items-start gap-3 p-3.5 rounded-xl bg-background-elevated border border-border">
+                          <span className="w-2 h-2 rounded-sm flex-shrink-0 mt-1.5" style={{ background: FAILURE_COLORS[i % FAILURE_COLORS.length] }} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="text-xs font-bold text-foreground">{f.reason}</p>
+                              <span className="badge-error text-[9px] px-1.5 py-0.5 rounded-md">{f.count}×</span>
+                            </div>
+                            <p className="text-xs text-foreground-muted">{DEBUG_TIPS[f.reason] ?? "Investigate transaction trace for details."}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === "Transactions" && (
+            <motion.div key="txs" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <div className="card-glass rounded-2xl border border-border p-5 sm:p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Transaction History</h3>
+                    <p className="text-xs text-foreground-muted mt-0.5">Last {Math.min(txs.length, 50)} transactions</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => exportToCsv(
+                    txs.map(t => ({ tx_hash: t.tx_hash, time: t.block_signed_at, success: t.successful, gas_usd: t.gas_quote, failure_reason: t.successful ? "" : parseFailureReason(t) })),
+                    `agent_${address?.slice(0,8)}`
+                  )} className="text-foreground-muted gap-1.5 h-8 text-xs hover:bg-accent/50 rounded-lg">
+                    <Download size={11} /> Export CSV
+                  </Button>
+                </div>
+
+                {isLoading ? (
+                  <div className="space-y-2.5">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} className="h-12 bg-background-elevated rounded-xl animate-shimmer" />
+                    ))}
+                  </div>
+                ) : txs.length === 0 ? (
+                  <p className="text-sm text-foreground-muted text-center py-10">No transactions found</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs min-w-[500px]">
+                      <thead>
+                        <tr className="text-[10px] uppercase tracking-wider text-foreground-subtle border-b border-border pb-2">
+                          <th className="text-left pb-3 font-semibold">Time</th>
+                          <th className="text-left pb-3 font-semibold hidden sm:table-cell">Tx Hash</th>
+                          <th className="text-center pb-3 font-semibold">Status</th>
+                          <th className="text-right pb-3 font-semibold">Gas USD</th>
+                          <th className="text-left pb-3 font-semibold">Reason</th>
+                          <th className="text-right pb-3 font-semibold">View</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {txs.slice(0, 50).map(tx => (
+                          <tr key={tx.tx_hash} className="border-t border-border/40 table-row-hover">
+                            <td className="py-3 pr-4 text-foreground-muted whitespace-nowrap">
+                              {new Date(tx.block_signed_at).toLocaleString(undefined, {
+                                month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+                              })}
+                            </td>
+                            <td className="py-3 pr-4 hidden sm:table-cell">
+                              <span className="font-mono text-foreground-subtle text-[10px]">{shortAddress(tx.tx_hash)}</span>
+                            </td>
+                            <td className="py-3 pr-4 text-center">
+                              <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold ${tx.successful ? "badge-success" : "badge-error"}`}>
+                                {tx.successful ? "✓" : "✗"}
+                              </span>
+                            </td>
+                            <td className="py-3 pr-4 text-right text-foreground-muted font-mono">
+                              {tx.gas_quote > 0 ? `$${tx.gas_quote.toFixed(4)}` : "—"}
+                            </td>
+                            <td className="py-3 pr-4">
+                              {!tx.successful && (
+                                <span className="badge-error px-1.5 py-0.5 rounded-md text-[9px] font-medium">
+                                  {parseFailureReason(tx)}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 text-right">
+                              <a href={`${TX_EXPLORER[profileChain] ?? ""}${tx.tx_hash}`} target="_blank" rel="noopener noreferrer"
+                                className="text-foreground-subtle hover:text-primary transition-colors p-1 rounded-md hover:bg-primary/10 inline-flex">
+                                <ExternalLink size={11} />
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
 
-function StatCard({
-  label,
-  value,
-  icon,
-  accent,
-}: {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-  accent: "primary" | "success" | "warning" | "destructive" | "secondary";
-}) {
-  const accentClass = {
-    primary: "text-primary",
-    success: "text-success",
-    warning: "text-warning",
-    destructive: "text-destructive",
-    secondary: "text-secondary",
-  }[accent];
-
+function EmptyChart() {
   return (
-    <div className="card-glow rounded-xl bg-background-card p-4">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] uppercase tracking-wider text-foreground-muted font-medium">{label}</p>
-        {icon}
-      </div>
-      <p className={`text-2xl font-bold ${accentClass}`}>{value}</p>
+    <div className="h-48 flex items-center justify-center text-xs text-foreground-subtle border border-border/30 rounded-xl bg-background-elevated/20">
+      No transaction data
     </div>
   );
 }
