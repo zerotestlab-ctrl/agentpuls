@@ -13,6 +13,8 @@ import AgentLeaderboard from "./pages/AgentLeaderboard";
 import CrossChainBenchmarks from "./pages/CrossChainBenchmarks";
 import FailuresExplorer from "./pages/FailuresExplorer";
 import HowItWorks from "./pages/HowItWorks";
+import AgentProfile from "./pages/AgentProfile";
+import MyTrackedAgents from "./pages/MyTrackedAgents";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,8 +32,10 @@ const App = () => (
               <Route path="/performance" element={<PerformanceAnalytics />} />
               <Route path="/leaderboard" element={<AgentLeaderboard />} />
               <Route path="/benchmarks" element={<CrossChainBenchmarks />} />
+              <Route path="/watchlist" element={<MyTrackedAgents />} />
               <Route path="/failures" element={<FailuresExplorer />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/agent/:address" element={<AgentProfile />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

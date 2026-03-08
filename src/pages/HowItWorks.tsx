@@ -75,9 +75,9 @@ export default function HowItWorks() {
           <BookOpen size={11} />
           Documentation
         </div>
-        <h1 className="text-2xl font-bold text-foreground">How AgentLens Works</h1>
+        <h1 className="text-2xl font-bold text-foreground">How AgentPulse Works</h1>
         <p className="text-sm text-foreground-muted mt-2 max-w-2xl">
-          AgentLens aggregates 100% public on-chain data using the ERC-8004 AI agent
+          AgentPulse aggregates 100% public on-chain data using the ERC-8004 AI agent
           identity standard and the Covalent GoldRush API. No custody, no login,
           no centralized database.
         </p>

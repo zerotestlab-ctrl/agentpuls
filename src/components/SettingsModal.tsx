@@ -1,5 +1,5 @@
 /**
- * AgentLens — Settings Modal
+ * AgentPulse — Settings Modal
  * API key + chain selection with localStorage persistence
  */
 import { useState } from "react";
@@ -14,10 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { useApp } from "@/contexts/AppContext";
+import { useApp, DEMO_API_KEY } from "@/contexts/AppContext";
 import { CHAIN_LABELS, type SupportedChain } from "@/lib/agents";
-import { Eye, EyeOff, ExternalLink, CheckCircle2, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, ExternalLink, CheckCircle2, AlertCircle, Info, Trash2 } from "lucide-react";
 
 interface SettingsModalProps {
   open: boolean;
@@ -27,15 +26,21 @@ interface SettingsModalProps {
 const CHAINS: SupportedChain[] = ["base-mainnet", "eth-mainnet", "avalanche-mainnet"];
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
-  const { apiKey, setAndSaveApiKey, chain, setAndSaveChain } = useApp();
-  const [draft, setDraft] = useState(apiKey);
+  const { apiKey, isDemo, setAndSaveApiKey, chain, setAndSaveChain } = useApp();
+  // Show empty if currently using demo key
+  const [draft, setDraft] = useState(isDemo ? "" : apiKey);
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
     setAndSaveApiKey(draft);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => { setSaved(false); onClose(); }, 1200);
+  };
+
+  const handleClear = () => {
+    setDraft("");
+    setAndSaveApiKey("");
   };
 
   return (
@@ -46,34 +51,59 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             <span className="text-neon">⚙</span> Settings
           </DialogTitle>
           <DialogDescription className="text-foreground-muted">
-            Configure your Covalent API key and default chain.
+            Configure your Covalent GoldRush API key and default chain.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-2">
+          {/* Demo mode notice */}
+          {isDemo && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-secondary/10 border border-secondary/20 text-xs text-secondary">
+              <Info size={12} className="mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">Demo Mode Active</p>
+                <p className="text-foreground-muted mt-0.5">
+                  Using shared demo key — rate limited. Enter your own free key for full access.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* API Key */}
           <div className="space-y-2">
             <Label className="text-sm font-medium text-foreground">
-              Covalent API Key
+              Covalent GoldRush API Key
             </Label>
             <div className="relative">
               <Input
                 type={showKey ? "text" : "password"}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="cqt_..."
-                className="bg-background-input border-border pr-10 font-mono text-sm focus:border-primary/60"
+                placeholder="cqt_…  (leave blank for demo mode)"
+                className="bg-background-input border-border pr-20 font-mono text-sm focus:border-primary/60"
               />
-              <button
-                type="button"
-                onClick={() => setShowKey((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground transition-colors"
-              >
-                {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {draft && (
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    className="text-foreground-subtle hover:text-destructive transition-colors p-1"
+                    title="Clear"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowKey((v) => !v)}
+                  className="text-foreground-muted hover:text-foreground transition-colors p-1"
+                >
+                  {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
             </div>
             <p className="text-xs text-foreground-muted flex items-center gap-1.5">
-              Free key available at{" "}
+              Free key at{" "}
               <a
                 href="https://www.covalenthq.com"
                 target="_blank"
@@ -82,6 +112,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               >
                 covalenthq.com <ExternalLink size={11} />
               </a>
+              — no credit card required
             </p>
 
             {draft && (
@@ -89,13 +120,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 className={`flex items-center gap-1.5 text-xs ${draft.length > 10 ? "text-success" : "text-destructive"}`}
               >
                 {draft.length > 10 ? (
-                  <>
-                    <CheckCircle2 size={12} /> Key looks valid
-                  </>
+                  <><CheckCircle2 size={12} /> Key looks valid</>
                 ) : (
-                  <>
-                    <AlertCircle size={12} /> Key seems too short
-                  </>
+                  <><AlertCircle size={12} /> Key seems too short</>
                 )}
               </div>
             )}
@@ -125,10 +152,10 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
           {/* Info box */}
           <div className="rounded-lg bg-primary-dim/30 border border-primary/20 p-3 text-xs text-foreground-muted space-y-1">
-            <p className="text-primary font-medium">100% Client-Side</p>
+            <p className="text-primary font-medium">100% Client-Side Privacy</p>
             <p>
               Your API key is stored only in your browser's localStorage. No data is
-              sent to any AgentLens server — all requests go directly to Covalent.
+              sent to any AgentPulse server — all requests go directly to Covalent.
             </p>
           </div>
         </div>
