@@ -1,108 +1,74 @@
 /**
- * AgentPulse — My Tracked Agents Watchlist
- * Portfolio-style page of user-tracked agents.
- * Metrics loaded on demand via "Load Metrics" button (no auto-fetch loops).
+ * AgentPulse — My Tracked Agents (Birdeye portfolio watchlist style)
  */
 import { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  AreaChart,
-  Area,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
+import { motion } from "framer-motion";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { useApp } from "@/contexts/AppContext";
 import {
-  fetchTransactions,
-  computeAgentMetrics,
-  buildDailyTimeSeries,
-  type AgentMetrics,
+  fetchTransactions, computeAgentMetrics, buildDailyTimeSeries, type AgentMetrics,
 } from "@/lib/covalent";
 import { shortAddress, CHAIN_LABELS } from "@/lib/agents";
 import { Button } from "@/components/ui/button";
-import {
-  Star,
-  StarOff,
-  TrendingUp,
-  Activity,
-  Zap,
-  Search,
-  Plus,
-  RefreshCw,
-} from "lucide-react";
+import { Star, StarOff, TrendingUp, Activity, Zap, Search, Plus, RefreshCw, CheckCircle2 } from "lucide-react";
 
 export default function MyTrackedAgents() {
   const { trackedAgents, untrackAgent, apiKey, metricsMap } = useApp();
   const navigate = useNavigate();
   const [agentMetrics, setAgentMetrics] = useState<Record<string, AgentMetrics>>({});
-  const [loadingAddresses, setLoadingAddresses] = useState<Set<string>>(new Set());
+  const [loadingSet, setLoadingSet] = useState<Set<string>>(new Set());
 
-  /** Manual load — called explicitly by user clicking "Load Metrics" */
-  const loadMetricsForAll = useCallback(async () => {
-    const toLoad = trackedAgents.filter(
-      (a) => !metricsMap[a.address] && !agentMetrics[a.address],
-    );
+  const loadAll = useCallback(async () => {
+    const toLoad = trackedAgents.filter(a => !metricsMap[a.address] && !agentMetrics[a.address]);
     if (!toLoad.length) return;
-
-    setLoadingAddresses((prev) => {
-      const next = new Set(prev);
-      toLoad.forEach((a) => next.add(a.address));
-      return next;
-    });
-
+    setLoadingSet(new Set(toLoad.map(a => a.address)));
     const results = await Promise.allSettled(
       toLoad.map(async (agent) => {
         const txs = await fetchTransactions(agent.chain, agent.address, apiKey, 50);
-        const agentInfo = { ...agent, framework: (agent as any).framework ?? "Unknown" };
-        const m = computeAgentMetrics(agentInfo, txs);
+        const m = computeAgentMetrics({ ...agent, framework: (agent as any).framework ?? "Unknown" }, txs);
         return { address: agent.address, metrics: m };
-      }),
+      })
     );
-
     const updates: Record<string, AgentMetrics> = {};
-    for (const result of results) {
-      if (result.status === "fulfilled") {
-        updates[result.value.address] = result.value.metrics;
-      }
-    }
-    setAgentMetrics((prev) => ({ ...prev, ...updates }));
-    setLoadingAddresses(new Set());
+    results.forEach(r => { if (r.status === "fulfilled") updates[r.value.address] = r.value.metrics; });
+    setAgentMetrics(prev => ({ ...prev, ...updates }));
+    setLoadingSet(new Set());
   }, [trackedAgents, apiKey, metricsMap, agentMetrics]);
 
-  const allMetrics = (address: string) =>
-    metricsMap[address] ?? agentMetrics[address];
+  const getMetrics = (address: string) => metricsMap[address] ?? agentMetrics[address];
+
+  const summary = useMemo(() => {
+    const ms = trackedAgents.map(a => getMetrics(a.address)).filter(Boolean) as AgentMetrics[];
+    return {
+      totalTxs: ms.reduce((a, m) => a + m.txCount, 0),
+      avgSuccess: ms.length ? ms.reduce((a, m) => a + m.successRate, 0) / ms.length : 0,
+      totalFails: ms.reduce((a, m) => a + m.failCount, 0),
+    };
+  }, [trackedAgents, agentMetrics, metricsMap]); // eslint-disable-line
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 space-y-8 animate-fade-in">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Star size={18} className="text-warning" />
-            My Tracked Agents
+          <h1 className="text-2xl font-black text-foreground flex items-center gap-2.5">
+            <Star size={20} className="text-warning" /> My Tracked Agents
           </h1>
           <p className="text-sm text-foreground-muted mt-1">
             {trackedAgents.length} agent{trackedAgents.length !== 1 ? "s" : ""} in your watchlist
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/leaderboard")}
-            className="border-border text-foreground-muted gap-1.5 text-xs"
-          >
+          <Button variant="outline" size="sm" onClick={() => navigate("/leaderboard")}
+            className="border-border text-foreground-muted gap-1.5 text-xs rounded-xl">
             <Plus size={12} /> Add Agents
           </Button>
           {trackedAgents.length > 0 && (
-            <Button
-              size="sm"
-              onClick={loadMetricsForAll}
-              disabled={loadingAddresses.size > 0}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5 text-xs"
-            >
-              <RefreshCw size={12} className={loadingAddresses.size > 0 ? "animate-spin" : ""} />
-              {loadingAddresses.size > 0 ? "Loading…" : "Load Metrics"}
+            <Button size="sm" onClick={loadAll} disabled={loadingSet.size > 0}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5 text-xs rounded-xl shadow-neon-sm">
+              <RefreshCw size={12} className={loadingSet.size > 0 ? "animate-spin" : ""} />
+              {loadingSet.size > 0 ? "Loading…" : "Load Metrics"}
             </Button>
           )}
         </div>
@@ -110,86 +76,66 @@ export default function MyTrackedAgents() {
 
       {/* Empty state */}
       {trackedAgents.length === 0 && (
-        <div className="card-glow rounded-xl bg-background-card p-16 text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
-            <Star size={24} className="text-primary" />
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          className="card-glass rounded-2xl border border-border p-16 text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-warning/10 border border-warning/20 flex items-center justify-center mx-auto">
+            <Star size={26} className="text-warning" />
           </div>
           <div>
-            <p className="text-base font-semibold text-foreground">No agents tracked yet</p>
-            <p className="text-sm text-foreground-muted mt-1 max-w-xs mx-auto">
-              Search for any agent address in the top bar, or browse the leaderboard to start tracking.
+            <p className="text-lg font-bold text-foreground">No agents tracked yet</p>
+            <p className="text-sm text-foreground-muted mt-2 max-w-sm mx-auto">
+              Browse the leaderboard or search any agent address to start tracking performance.
             </p>
           </div>
           <div className="flex items-center justify-center gap-3">
-            <Button
-              onClick={() => navigate("/leaderboard")}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5"
-              size="sm"
-            >
+            <Button onClick={() => navigate("/leaderboard")}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 rounded-xl shadow-neon-sm">
               <TrendingUp size={13} /> Browse Leaderboard
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const input = document.querySelector<HTMLInputElement>('input[placeholder*="Search agent"]');
-                input?.focus();
-              }}
-              className="border-border gap-1.5"
-            >
+            <Button variant="outline" size="sm" onClick={() => {
+              const input = document.querySelector<HTMLInputElement>('input[placeholder*="Search agent"]');
+              input?.focus();
+            }} className="border-border gap-2 rounded-xl">
               <Search size={13} /> Search Address
             </Button>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* Portfolio summary */}
+      {/* Portfolio summary cards */}
       {trackedAgents.length > 0 && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <SummaryCard
-              label="Tracked Agents"
-              value={trackedAgents.length.toString()}
-              icon={<Star size={13} className="text-warning" />}
-            />
-            <SummaryCard
-              label="Total Txs"
-              value={Object.values(agentMetrics)
-                .concat(Object.values(metricsMap).filter((m) => trackedAgents.some((a) => a.address === m.address)))
-                .reduce((a, m) => a + m.txCount, 0)
-                .toLocaleString()}
-              icon={<Activity size={13} className="text-primary" />}
-            />
-            <SummaryCard
-              label="Avg Success Rate"
-              value={(() => {
-                const ms = trackedAgents.map((a) => allMetrics(a.address)).filter(Boolean) as AgentMetrics[];
-                if (!ms.length) return "—";
-                return `${(ms.reduce((a, m) => a + m.successRate, 0) / ms.length).toFixed(1)}%`;
-              })()}
-              icon={<TrendingUp size={13} className="text-success" />}
-            />
-            <SummaryCard
-              label="Total Failures"
-              value={trackedAgents.map((a) => allMetrics(a.address)).filter(Boolean).reduce((a, m) => a + (m?.failCount ?? 0), 0).toString()}
-              icon={<Zap size={13} className="text-destructive" />}
-            />
+            {[
+              { label: "Tracked", value: trackedAgents.length.toString(), icon: <Star size={13} className="text-warning" /> },
+              { label: "Total Txs", value: summary.totalTxs.toLocaleString(), icon: <Activity size={13} className="text-primary" /> },
+              { label: "Avg Success", value: summary.avgSuccess > 0 ? `${summary.avgSuccess.toFixed(1)}%` : "—", icon: <CheckCircle2 size={13} className="text-success" /> },
+              { label: "Total Fails", value: summary.totalFails.toString(), icon: <Zap size={13} className="text-destructive" /> },
+            ].map((s, i) => (
+              <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
+                className="card-glass rounded-2xl border border-border p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] uppercase tracking-widest text-foreground-subtle font-semibold">{s.label}</p>
+                  {s.icon}
+                </div>
+                <p className="text-2xl font-black text-foreground num-ticker">{s.value}</p>
+              </motion.div>
+            ))}
           </div>
 
-          {/* Agent tiles grid */}
+          {/* Agent tiles */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {trackedAgents.map((agent) => {
-              const m = allMetrics(agent.address);
-              const isLoading = loadingAddresses.has(agent.address);
+            {trackedAgents.map((agent, i) => {
+              const m = getMetrics(agent.address);
+              const loading = loadingSet.has(agent.address);
               return (
-                <AgentTile
-                  key={agent.address}
-                  agent={agent}
-                  metrics={m}
-                  isLoading={isLoading}
-                  onView={() => navigate(`/agent/${agent.address}`)}
-                  onUntrack={() => untrackAgent(agent.address)}
-                />
+                <motion.div key={agent.address}
+                  initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.05 }}>
+                  <AgentTile agent={agent} metrics={m} isLoading={loading}
+                    onView={() => navigate(`/agent/${agent.address}`)}
+                    onUntrack={() => untrackAgent(agent.address)} />
+                </motion.div>
               );
             })}
           </div>
@@ -199,138 +145,86 @@ export default function MyTrackedAgents() {
   );
 }
 
-function SummaryCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
-  return (
-    <div className="card-glow rounded-xl bg-background-card p-4">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] uppercase tracking-wider text-foreground-muted font-medium">{label}</p>
-        {icon}
-      </div>
-      <p className="text-2xl font-bold text-foreground">{value}</p>
-    </div>
-  );
-}
-
 function AgentTile({
-  agent,
-  metrics,
-  isLoading,
-  onView,
-  onUntrack,
+  agent, metrics, isLoading, onView, onUntrack
 }: {
   agent: { address: string; name: string; chain: string; addedAt: number };
-  metrics?: AgentMetrics;
-  isLoading: boolean;
-  onView: () => void;
-  onUntrack: () => void;
+  metrics?: AgentMetrics; isLoading: boolean; onView: () => void; onUntrack: () => void;
 }) {
-  // Mini sparkline data
-  const spark = useMemo(() => {
-    if (!metrics) return [];
-    return buildDailyTimeSeries(metrics.recentTxs, 7);
-  }, [metrics]);
-
-  const successColor =
-    !metrics || metrics.successRate === 0
-      ? "text-foreground-muted"
-      : metrics.successRate >= 90
-      ? "text-success"
-      : metrics.successRate >= 70
-      ? "text-warning"
-      : "text-destructive";
+  const spark = useMemo(() => metrics ? buildDailyTimeSeries(metrics.recentTxs, 7) : [], [metrics]);
+  const successColor = !metrics ? "text-foreground-muted"
+    : metrics.successRate >= 90 ? "text-success"
+    : metrics.successRate >= 70 ? "text-warning" : "text-destructive";
+  const sparkColor = !metrics ? "hsl(142,76%,48%)"
+    : metrics.successRate >= 90 ? "hsl(142,76%,48%)"
+    : metrics.successRate >= 70 ? "hsl(38,100%,55%)" : "hsl(0,84%,60%)";
 
   return (
-    <div
-      className="card-glow rounded-xl bg-background-card p-4 cursor-pointer hover:border-primary/30 transition-all group"
-      onClick={onView}
-    >
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-            {agent.name}
-          </p>
-          <p className="text-[10px] font-mono text-foreground-subtle mt-0.5">
-            {shortAddress(agent.address)}
-          </p>
+    <div className="card-glass card-glass-hover rounded-2xl border border-border p-5 cursor-pointer group"
+      onClick={onView}>
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center flex-shrink-0">
+            <Zap size={14} className="text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-foreground truncate group-hover:text-primary transition-colors">{agent.name}</p>
+            <p className="text-[9px] font-mono text-foreground-subtle">{shortAddress(agent.address)}</p>
+          </div>
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onUntrack(); }}
-          className="text-warning hover:text-warning/60 transition-colors flex-shrink-0 mt-0.5"
-          title="Remove from watchlist"
-        >
-          <StarOff size={14} />
+        <button onClick={e => { e.stopPropagation(); onUntrack(); }}
+          className="text-warning/60 hover:text-warning transition-colors flex-shrink-0 p-1.5 hover:bg-warning/10 rounded-lg">
+          <StarOff size={13} />
         </button>
       </div>
 
       {isLoading ? (
-        <div className="space-y-2">
-          <div className="h-12 bg-background-elevated rounded animate-shimmer bg-[length:200%_100%]" />
-          <div className="h-4 w-1/2 bg-background-elevated rounded animate-shimmer bg-[length:200%_100%]" />
+        <div className="space-y-2.5">
+          <div className="h-14 bg-background-elevated rounded-xl animate-shimmer" />
+          <div className="h-3.5 w-1/2 bg-background-elevated rounded animate-shimmer" />
         </div>
       ) : metrics ? (
         <>
-          {/* Stats row */}
-          <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="grid grid-cols-3 gap-2 mb-4">
             <div>
-              <p className="text-[9px] text-foreground-subtle uppercase tracking-wider">Txs</p>
-              <p className="text-sm font-bold text-foreground">{metrics.txCount.toLocaleString()}</p>
+              <p className="text-[9px] text-foreground-subtle uppercase tracking-wider font-semibold">Txs</p>
+              <p className="text-base font-black text-foreground num-ticker">{metrics.txCount.toLocaleString()}</p>
             </div>
             <div>
-              <p className="text-[9px] text-foreground-subtle uppercase tracking-wider">Success</p>
-              <p className={`text-sm font-bold ${successColor}`}>
-                {metrics.successRate.toFixed(1)}%
-              </p>
+              <p className="text-[9px] text-foreground-subtle uppercase tracking-wider font-semibold">Success</p>
+              <p className={`text-base font-black num-ticker ${successColor}`}>{metrics.successRate.toFixed(1)}%</p>
             </div>
             <div>
-              <p className="text-[9px] text-foreground-subtle uppercase tracking-wider">Failures</p>
-              <p className="text-sm font-bold text-destructive">{metrics.failCount}</p>
+              <p className="text-[9px] text-foreground-subtle uppercase tracking-wider font-semibold">Fails</p>
+              <p className="text-base font-black text-destructive num-ticker">{metrics.failCount}</p>
             </div>
           </div>
 
-          {/* Sparkline */}
           {spark.length > 0 && (
-            <div className="h-12 -mx-1">
+            <div className="h-14 -mx-1 mb-3">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={spark} margin={{ top: 2, right: 2, bottom: 0, left: 2 }}>
                   <defs>
-                    <linearGradient id={`spark-${agent.address.slice(2, 8)}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(182,100%,45%)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(182,100%,45%)" stopOpacity={0} />
+                    <linearGradient id={`sp-${agent.address.slice(2, 8)}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={sparkColor} stopOpacity={0.35} />
+                      <stop offset="95%" stopColor={sparkColor} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Tooltip
-                    content={({ active, payload }) =>
-                      active && payload?.length ? (
-                        <div className="bg-background-elevated border border-border rounded px-2 py-1 text-[9px]">
-                          {typeof payload[0]?.value === "number" ? payload[0].value.toFixed(0) : payload[0]?.value}% success
-                        </div>
-                      ) : null
-                    }
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="successRate"
-                    stroke="hsl(182,100%,45%)"
-                    strokeWidth={1.5}
-                    fill={`url(#spark-${agent.address.slice(2, 8)})`}
-                    dot={false}
-                  />
+                  <Area type="monotone" dataKey="successRate" stroke={sparkColor} strokeWidth={1.5}
+                    fill={`url(#sp-${agent.address.slice(2, 8)})`} dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           )}
         </>
       ) : (
-        <div className="flex items-center gap-2 text-xs text-foreground-muted">
-          <RefreshCw size={11} className="animate-spin" />
-          <span>Loading…</span>
+        <div className="h-16 flex items-center justify-center">
+          <p className="text-xs text-foreground-subtle">Click "Load Metrics" to fetch data</p>
         </div>
       )}
 
-      {/* Footer */}
-      <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
-        <span className="badge-info text-[9px] px-1.5 py-0.5 rounded">
+      <div className="flex items-center justify-between pt-3 border-t border-border/50">
+        <span className="badge-info text-[9px] px-2 py-0.5 rounded-lg font-medium">
           {CHAIN_LABELS[agent.chain as any] ?? agent.chain}
         </span>
         <span className="text-[9px] text-foreground-subtle">

@@ -6,8 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "@/contexts/AppContext";
 import { Layout } from "@/components/Layout";
 
-// Pages
 import Overview from "./pages/Overview";
+import BubbleMap from "./pages/BubbleMap";
 import PerformanceAnalytics from "./pages/PerformanceAnalytics";
 import AgentLeaderboard from "./pages/AgentLeaderboard";
 import CrossChainBenchmarks from "./pages/CrossChainBenchmarks";
@@ -29,6 +29,7 @@ const App = () => (
           <Layout>
             <Routes>
               <Route path="/" element={<Overview />} />
+              <Route path="/bubblemap" element={<BubbleMap />} />
               <Route path="/performance" element={<PerformanceAnalytics />} />
               <Route path="/leaderboard" element={<AgentLeaderboard />} />
               <Route path="/benchmarks" element={<CrossChainBenchmarks />} />
@@ -36,7 +37,6 @@ const App = () => (
               <Route path="/failures" element={<FailuresExplorer />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/agent/:address" element={<AgentProfile />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>
