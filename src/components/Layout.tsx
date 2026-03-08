@@ -1,6 +1,7 @@
 /**
- * AgentPulse — Main Layout (header + sidebar + content)
- * Features: sticky global search bar, demo mode banner, refresh toast
+ * AgentPulse — Main Layout
+ * Header: logo + search + settings only
+ * Demo banner, error banner, footer with GoldRush credit
  */
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -9,30 +10,29 @@ import { AppSidebar } from "./AppSidebar";
 import { SettingsModal } from "./SettingsModal";
 import { EmbedModal } from "./EmbedModal";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useApp } from "@/contexts/AppContext";
-import { CHAIN_LABELS, KNOWN_AGENTS, shortAddress } from "@/lib/agents";
+import { KNOWN_AGENTS, shortAddress } from "@/lib/agents";
 import {
   Settings,
   RefreshCw,
-  Code2,
   AlertTriangle,
   Search,
   X,
   Zap,
   Info,
+  Github,
+  Twitter,
 } from "lucide-react";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-// Ethereum address regex
 const ETH_ADDR = /^0x[0-9a-fA-F]{40}$/;
 
 export function Layout({ children }: LayoutProps) {
-  const { isLoading, refresh, error, isDemo, chain, loadProgress } = useApp();
+  const { isLoading, refresh, error, isDemo, loadProgress } = useApp();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -57,7 +57,6 @@ export function Layout({ children }: LayoutProps) {
       setSearchQuery("");
       searchRef.current?.blur();
     } else if (addr) {
-      // Try to find by name
       const found = KNOWN_AGENTS.find((a) => a.name.toLowerCase().includes(addr.toLowerCase()));
       if (found) {
         navigate(`/agent/${found.address}`);
@@ -67,7 +66,7 @@ export function Layout({ children }: LayoutProps) {
     }
   };
 
-  // Global keyboard shortcut: Cmd+K or /
+  // Global keyboard shortcut: Cmd+K
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -89,7 +88,7 @@ export function Layout({ children }: LayoutProps) {
           {isDemo && showDemoBanner && (
             <div className="flex items-center justify-between px-4 py-2 bg-secondary-dim/40 border-b border-secondary/20 text-xs flex-shrink-0">
               <div className="flex items-center gap-2 text-secondary">
-                <Info size={12} />
+                <Info size={12} className="flex-shrink-0" />
                 <span className="font-medium">Demo mode active (rate-limited).</span>
                 <span className="text-foreground-muted hidden sm:inline">
                   Add your free{" "}
@@ -101,19 +100,19 @@ export function Layout({ children }: LayoutProps) {
                   >
                     GoldRush key
                   </a>{" "}
-                  for unlimited access.
+                  in Settings for unlimited access.
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setSettingsOpen(true)}
-                  className="text-secondary underline hover:no-underline text-xs"
+                  className="text-secondary underline hover:no-underline text-xs font-medium"
                 >
                   Add Key →
                 </button>
                 <button
                   onClick={() => setShowDemoBanner(false)}
-                  className="text-foreground-subtle hover:text-foreground"
+                  className="text-foreground-subtle hover:text-foreground p-0.5 rounded"
                 >
                   <X size={12} />
                 </button>
@@ -121,34 +120,23 @@ export function Layout({ children }: LayoutProps) {
             </div>
           )}
 
-          {/* Top Header */}
-          <header className="h-14 flex items-center justify-between px-4 gap-3 border-b border-border bg-background-secondary/50 backdrop-blur-sm flex-shrink-0 sticky top-0 z-40">
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <SidebarTrigger className="text-foreground-muted hover:text-foreground" />
-
-              {/* Chain badge */}
-              <Badge
-                variant="outline"
-                className="text-xs border-border-accent/50 text-primary bg-primary-dim/20 hidden sm:flex"
-              >
-                {CHAIN_LABELS[chain]}
-              </Badge>
-
-              {/* Loading progress */}
-              {isLoading && (
-                <div className="flex items-center gap-2 text-xs text-foreground-muted">
-                  <RefreshCw size={12} className="animate-spin text-primary" />
-                  <span className="hidden sm:inline">
-                    {loadProgress}%
-                  </span>
+          {/* ── Top Header ── */}
+          <header className="h-14 flex items-center justify-between px-3 sm:px-4 gap-3 border-b border-border bg-background-secondary/60 backdrop-blur-sm flex-shrink-0 sticky top-0 z-40">
+            {/* Left: trigger + logo */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <SidebarTrigger className="text-foreground-muted hover:text-foreground h-8 w-8" />
+              <div className="flex items-center gap-1.5 select-none">
+                <div className="w-6 h-6 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-neon-sm">
+                  <Zap size={12} className="text-primary-foreground" />
                 </div>
-              )}
+                <span className="font-bold text-sm text-foreground hidden sm:block">AgentPulse</span>
+              </div>
             </div>
 
-            {/* Global search bar */}
-            <div className="flex-1 max-w-md relative">
+            {/* Center: global search */}
+            <div className="flex-1 max-w-sm sm:max-w-md relative">
               <div className="relative">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted z-10" />
+                <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted z-10 pointer-events-none" />
                 <Input
                   ref={searchRef}
                   value={searchQuery}
@@ -160,20 +148,21 @@ export function Layout({ children }: LayoutProps) {
                     if (e.key === "Escape") { setSearchQuery(""); searchRef.current?.blur(); }
                   }}
                   placeholder="Search agent address or name…"
-                  className="pl-8 pr-16 bg-background-input border-border text-xs h-8 focus:border-primary/40 transition-colors"
+                  className="pl-8 pr-14 bg-background-input border-border text-xs h-8 focus:border-primary/50 transition-colors placeholder:text-foreground-subtle"
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                  {searchQuery && (
+                  {searchQuery ? (
                     <button
                       onClick={() => setSearchQuery("")}
-                      className="text-foreground-subtle hover:text-foreground p-0.5"
+                      className="text-foreground-subtle hover:text-foreground"
                     >
                       <X size={11} />
                     </button>
+                  ) : (
+                    <kbd className="hidden sm:inline-flex items-center px-1 py-0.5 rounded border border-border text-[9px] text-foreground-subtle font-mono">
+                      ⌘K
+                    </kbd>
                   )}
-                  <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded border border-border text-[9px] text-foreground-subtle font-mono">
-                    ⌘K
-                  </kbd>
                 </div>
               </div>
 
@@ -189,7 +178,7 @@ export function Layout({ children }: LayoutProps) {
                         <Search size={11} className="text-primary" />
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-foreground">Search address</p>
+                        <p className="text-xs font-medium text-foreground">Open agent profile</p>
                         <p className="text-[10px] text-foreground-muted font-mono">{shortAddress(searchQuery)}</p>
                       </div>
                     </button>
@@ -203,11 +192,11 @@ export function Layout({ children }: LayoutProps) {
                       <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <Zap size={11} className="text-primary" />
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs font-medium text-foreground truncate">{agent.name}</p>
                         <p className="text-[10px] text-foreground-muted font-mono">{shortAddress(agent.address)}</p>
                       </div>
-                      <span className="ml-auto badge-info text-[9px] px-1.5 py-0.5 rounded flex-shrink-0">
+                      <span className="badge-info text-[9px] px-1.5 py-0.5 rounded flex-shrink-0">
                         {agent.framework}
                       </span>
                     </button>
@@ -216,8 +205,8 @@ export function Layout({ children }: LayoutProps) {
               )}
             </div>
 
-            {/* Right actions */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Right: actions */}
+            <div className="flex items-center gap-1 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="sm"
@@ -226,19 +215,8 @@ export function Layout({ children }: LayoutProps) {
                 className="text-foreground-muted hover:text-foreground h-8 w-8 p-0"
                 title="Refresh data"
               >
-                <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
+                <RefreshCw size={14} className={isLoading ? "animate-spin text-primary" : ""} />
               </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setEmbedOpen(true)}
-                className="text-foreground-muted hover:text-foreground h-8 w-8 p-0"
-                title="Get embed code"
-              >
-                <Code2 size={14} />
-              </Button>
-
               <Button
                 variant="ghost"
                 size="sm"
@@ -255,11 +233,11 @@ export function Layout({ children }: LayoutProps) {
           {error && (
             <div className="flex items-center gap-2 px-4 py-2.5 bg-destructive-dim border-b border-destructive/30 text-xs text-destructive flex-shrink-0">
               <AlertTriangle size={12} className="flex-shrink-0" />
-              <span>{error}</span>
+              <span className="flex-1">{error}</span>
               {error.includes("key") && (
                 <button
                   onClick={() => setSettingsOpen(true)}
-                  className="ml-2 underline hover:no-underline"
+                  className="underline hover:no-underline font-medium flex-shrink-0"
                 >
                   Open Settings →
                 </button>
@@ -282,46 +260,28 @@ export function Layout({ children }: LayoutProps) {
             {children}
 
             {/* Footer */}
-            <footer className="border-t border-border mt-8 px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-foreground-subtle">
+            <footer className="border-t border-border mt-8 px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-foreground-subtle">
               <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-success pulse-neon" />
-                <p>100% on-chain public data · No login · No custody · Built for the agent economy</p>
+                <span className="w-1.5 h-1.5 rounded-full bg-success pulse-neon flex-shrink-0" />
+                <span>Powered by GoldRush · 100% on-chain public data · No login · No custody</span>
               </div>
               <div className="flex items-center gap-3">
                 <a
                   href="https://github.com/agentpulse"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-foreground-muted transition-colors"
+                  className="flex items-center gap-1 hover:text-foreground-muted transition-colors"
                 >
-                  GitHub
+                  <Github size={12} /> GitHub
                 </a>
                 <span>·</span>
                 <a
                   href="https://twitter.com/intent/tweet?text=Check+out+AgentPulse+—+on-chain+AI+agent+analytics!&url=https://agentpulse.app"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-foreground-muted transition-colors"
+                  className="flex items-center gap-1 hover:text-foreground-muted transition-colors"
                 >
-                  Share on X
-                </a>
-                <span>·</span>
-                <a
-                  href="https://8004agents.ai"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-foreground-muted transition-colors"
-                >
-                  8004agents.ai
-                </a>
-                <span>·</span>
-                <a
-                  href="https://www.covalenthq.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-foreground-muted transition-colors"
-                >
-                  Powered by Covalent
+                  <Twitter size={12} /> Share on X
                 </a>
               </div>
             </footer>
