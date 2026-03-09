@@ -1,6 +1,6 @@
 # AgentPulse
 
-**The Birdeye.so for on-chain AI agents** — Real-time performance analytics, success rates, failure forensics, and gas efficiency benchmarks for autonomous agents across Base, Ethereum, Avalanche and beyond.
+**The analytics platform for on-chain AI agents** — Real-time performance analytics, success rates, failure forensics, and gas efficiency benchmarks for autonomous agents across Base, Ethereum, Avalanche and beyond.
 
 Live demo: [Coming in 24h after final export]  
 GitHub: https://github.com/zerotestlab-ctrl/agentpulse
@@ -18,9 +18,9 @@ AgentPulse is the missing public-good layer: neutral, open, performance-first an
 ### 🫧 Interactive Bubble Map (Homepage)
 - Agents as living bubbles: size = 24h transaction volume, color = success rate (green → red gradient)
 - Hover tooltips + time filters (4H / 24H / 7D)
-- Click any bubble → full Birdeye-style Agent Profile
+- Click any bubble → full Agent Profile
 
-### 📊 Agent Profile (Birdeye-level detail)
+### 📊 Agent Profile
 - Hero header with blockie avatar + name/ID
 - Elegant stat grid (Success %, Gas per Success, Failures, Volume)
 - Success-rate price-style chart + failure heatmap
@@ -58,6 +58,11 @@ No login. No custody. No data collection. Pure public good.
 - GoldRush API + The Graph
 - Fully responsive (mobile-first)
 
+## Roadmap (next 30 days – after launch & first grants)
+- [ ] Public API for agents to self-query performance
+- [ ] Telegram + Discord failure alerts (opt-in)
+- [ ] Official embed widget for Virtuals, Clanker, and elizaOS dashboards
+
 ## Quick Start (Local)
 
 ```bash
@@ -65,8 +70,3 @@ git clone https://github.com/zerotestlab-ctrl/agentpulse.git
 cd agentpulse
 npm install
 npm run dev
-
-## Roadmap (next 30 days – after launch & first grants)
-- [ ] Public API for agents to self-query performance
-- [ ] Telegram + Discord failure alerts (opt-in)
-- [ ] Official embed widget for Virtuals, Clanker, and elizaOS dashboards
