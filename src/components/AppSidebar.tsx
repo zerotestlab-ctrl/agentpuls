@@ -94,7 +94,7 @@ export function AppSidebar() {
             <SidebarMenu className="space-y-0.5">
               {mainItems.map(item => {
                 const active = isActive(item.url);
-                const badge = item.url === "/watchlist" ? trackedAgents.length : 0;
+                const badge = item.url === "/tracked" ? trackedAgents.length : 0;
                 return (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
