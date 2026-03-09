@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard, TrendingUp, Trophy, GitCompareArrows,
-  Bug, BookOpen, Star, Zap, ChevronLeft, ChevronRight, Radar,
+  Bug, BookOpen, Star, Activity, ChevronLeft, ChevronRight, Radar,
 } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { CHAIN_LABELS } from "@/lib/agents";

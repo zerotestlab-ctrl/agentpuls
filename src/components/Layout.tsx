@@ -18,7 +18,7 @@ import { useApp } from "@/contexts/AppContext";
 import { KNOWN_AGENTS, shortAddress } from "@/lib/agents";
 import {
   Settings, RefreshCw, AlertTriangle, Search,
-  X, Zap, Github, Twitter, KeyRound, ChevronRight
+  X, Activity, Github, Twitter, KeyRound, ChevronRight
 } from "lucide-react";
 
 interface LayoutProps { children: React.ReactNode; }
