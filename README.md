@@ -1,73 +1,72 @@
-# Welcome to your Lovable project
+# AgentPulse
 
-## Project info
+**The Birdeye.so for on-chain AI agents** — Real-time performance analytics, success rates, failure forensics, and gas efficiency benchmarks for autonomous agents across Base, Ethereum, Avalanche and beyond.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Live demo: [Coming in 24h after final export]  
+GitHub: https://github.com/zerotestlab-ctrl/agentpulse
 
-## How can I edit this code?
+## Why AgentPulse Matters
 
-There are several ways of editing your application.
+2026 is the year of on-chain AI agents (trading swarms, autonomous governance, cross-chain executors).  
+Dune shows volume. Virtuals shows its own revenue.  
+**Nobody** shows whether agents actually succeed, why they fail, or which frameworks are truly efficient.
 
-**Use Lovable**
+AgentPulse is the missing public-good layer: neutral, open, performance-first analytics that every agent builder, protocol, and investor needs daily.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Core Features
 
-Changes made via Lovable will be committed automatically to this repo.
+### 🫧 Interactive Bubble Map (Homepage)
+- Agents as living bubbles: size = 24h transaction volume, color = success rate (green → red gradient)
+- Hover tooltips + time filters (4H / 24H / 7D)
+- Click any bubble → full Birdeye-style Agent Profile
 
-**Use your preferred IDE**
+### 📊 Agent Profile (Birdeye-level detail)
+- Hero header with blockie avatar + name/ID
+- Elegant stat grid (Success %, Gas per Success, Failures, Volume)
+- Success-rate price-style chart + failure heatmap
+- Tabs: Overview • Performance • Failures Explorer • Transaction History
+- One-click “Track Agent” → adds to your personal watchlist
+- Shareable links (`?agent=0x...`)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 📈 Performance Analytics & Leaderboards
+- Real success/failure classification (revert reasons parsed)
+- Gas efficiency benchmarks across frameworks (Virtuals, elizaOS, Clanker, etc.)
+- Cross-chain comparison bars
+- Sortable leaderboards with min-success-rate filters
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### ❤️ My Tracked Agents
+Portfolio-style grid of agents you’re watching — live updates on one page.
 
-Follow these steps:
+### 🛠️ Failures Explorer
+Detailed failed transactions with debug tips and gas wasted.
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## How It Works (100% on-chain, zero trust)
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+1. Uses public **GoldRush (Covalent)** API for transaction data + **The Graph** ERC-8004 subgraph for agent discovery.
+2. First load = beautiful demo data (instant <300ms).
+3. Add your free GoldRush key in Settings → unlock live data.
+4. Click **Refresh Data** (manual only — no auto-refresh, no loops).
+5. All data cached with TanStack Query for speed.
 
-# Step 3: Install the necessary dependencies.
-npm i
+No login. No custody. No data collection. Pure public good.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+## Tech Stack
+
+- React + TypeScript + Vite
+- Tailwind + shadcn/ui + Framer Motion
+- Recharts + TanStack React Query
+- GoldRush API + The Graph
+- Fully responsive (mobile-first)
+
+## Quick Start (Local)
+
+```bash
+git clone https://github.com/zerotestlab-ctrl/agentpulse.git
+cd agentpulse
+npm install
 npm run dev
-```
 
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Roadmap (next 30 days – after launch & first grants)
+- [ ] Public API for agents to self-query performance
+- [ ] Telegram + Discord failure alerts (opt-in)
+- [ ] Official embed widget for Virtuals, Clanker, and elizaOS dashboards
