@@ -74,14 +74,18 @@ const App = () => (
               <Route path="/leaderboard"   element={<AgentLeaderboard />} />
               <Route path="/performance"   element={<PerformanceAnalytics />} />
               <Route path="/benchmarks"    element={<CrossChainBenchmarks />} />
-              <Route path="/watchlist"     element={<MyTrackedAgents />} />
+
+              {/* /tracked and /watchlist both work */}
+              <Route path="/tracked"       element={<MyTrackedAgents />} />
+              <Route path="/watchlist"     element={<Navigate to="/tracked" replace />} />
 
               {/* ── Tools ── */}
               <Route path="/failures"      element={<FailuresExplorer />} />
               <Route path="/how-it-works"  element={<HowItWorks />} />
 
-              {/* ── Agent profile (shareable: ?agent=0x... also supported via search) ── */}
-              <Route path="/agent/:address" element={<AgentProfile />} />
+              {/* ── Agent profile — both /profile/:address and /agent/:address work ── */}
+              <Route path="/profile/:address" element={<AgentProfile />} />
+              <Route path="/agent/:address"   element={<AgentProfile />} />
 
               {/* ── 404 ── */}
               <Route path="*"              element={<NotFound />} />

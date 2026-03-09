@@ -64,8 +64,14 @@ export function Layout({ children }: LayoutProps) {
         searchRef.current?.focus();
       }
     };
+    // Handle open-settings custom event dispatched from pages (BubbleMap, Overview etc.)
+    const onOpenSettings = () => setSettingsOpen(true);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("open-settings", onOpenSettings);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("open-settings", onOpenSettings);
+    };
   }, []);
 
   return (

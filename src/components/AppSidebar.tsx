@@ -31,7 +31,7 @@ const NAV_ITEMS = [
   { title: "Performance",  url: "/performance", icon: TrendingUp,       group: "analytics" },
   { title: "Leaderboard",  url: "/leaderboard", icon: Trophy,           group: "analytics" },
   { title: "Cross-Chain",  url: "/benchmarks",  icon: GitCompareArrows, group: "analytics" },
-  { title: "My Agents",    url: "/watchlist",   icon: Star,             group: "analytics" },
+  { title: "My Agents",    url: "/tracked",     icon: Star,             group: "analytics" },
   { title: "Failures",     url: "/failures",    icon: Bug,              group: "tools" },
   { title: "How It Works", url: "/how-it-works",icon: BookOpen,         group: "tools" },
 ] as const;

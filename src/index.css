@@ -234,4 +234,29 @@
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
   }
+
+  /* Page fade-in */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out both;
+  }
+
+  /* Hero radial glow background (used in Overview & Profile hero sections) */
+  .bg-hero-glow {
+    background: radial-gradient(ellipse 80% 60% at 50% -20%, hsl(var(--primary) / 0.12) 0%, transparent 70%);
+  }
+
+  /* Card shadow utility */
+  .shadow-card-elevated {
+    box-shadow: 0 8px 40px hsl(0 0% 0% / 0.7);
+  }
+  .shadow-neon-sm {
+    box-shadow: 0 0 8px hsl(var(--primary) / 0.4);
+  }
+  .shadow-neon {
+    box-shadow: 0 0 16px hsl(var(--primary) / 0.5), 0 0 32px hsl(var(--primary) / 0.2);
+  }
 }
