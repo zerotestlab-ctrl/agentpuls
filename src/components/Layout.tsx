@@ -260,7 +260,7 @@ export function Layout({ children }: LayoutProps) {
                 <span>Powered by GoldRush + The Graph · 100% on-chain public data · No login · No custody</span>
               </div>
               <div className="flex items-center gap-3">
-                <a href="https://github.com/agentpuls" target="_blank" rel="noopener noreferrer"
+                <a href="https://github.com/zerotestlab-ctrl/agentpuls/tree/main" target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1 hover:text-foreground-muted transition-colors">
                   <Github size={12} /> GitHub
                 </a>
