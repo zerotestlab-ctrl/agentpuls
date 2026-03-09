@@ -146,8 +146,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsLiveMode(true);
 
       toast({
-        title: "✓ Data refreshed",
-        description: `Live data loaded for ${agents.length} agents on ${chain}`,
+        title: "✓ Live data loaded",
+        description: `${agents.length} agents refreshed on ${chain}`,
         duration: 2500,
       });
     } catch (err) {
