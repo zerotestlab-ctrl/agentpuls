@@ -1,9 +1,18 @@
 /**
  * AgentPulse — Premium Sidebar (Birdeye-style)
- * Collapsible desktop (icon mode), drawer mobile auto-closes on selection
+ * Collapsible desktop (icon mode), drawer mobile auto-closes on selection.
+ *
+ * Route map matches App.tsx exactly:
+ *   /           → Bubble Map (homepage)
+ *   /overview   → Overview
+ *   /performance → Performance Analytics
+ *   /leaderboard → Leaderboard
+ *   /benchmarks → Cross-Chain
+ *   /watchlist  → My Agents
+ *   /failures   → Failures
+ *   /how-it-works → How It Works
  */
 import { useLocation, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
@@ -11,22 +20,21 @@ import {
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard, TrendingUp, Trophy, GitCompareArrows,
-  Bug, BookOpen, Star, Zap, RefreshCw, ChevronLeft,
-  ChevronRight, Radar,
+  Bug, BookOpen, Star, Zap, ChevronLeft, ChevronRight, Radar,
 } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { CHAIN_LABELS } from "@/lib/agents";
 
 const NAV_ITEMS = [
-  { title: "Overview",     url: "/",            icon: LayoutDashboard, group: "main" },
-  { title: "Bubble Map",   url: "/bubblemap",   icon: Radar,           group: "main" },
-  { title: "Performance",  url: "/performance", icon: TrendingUp,      group: "main" },
-  { title: "Leaderboard",  url: "/leaderboard", icon: Trophy,          group: "main" },
-  { title: "Cross-Chain",  url: "/benchmarks",  icon: GitCompareArrows, group: "main" },
-  { title: "My Agents",    url: "/watchlist",   icon: Star,            group: "main" },
-  { title: "Failures",     url: "/failures",    icon: Bug,             group: "tools" },
-  { title: "How It Works", url: "/how-it-works",icon: BookOpen,        group: "tools" },
-];
+  { title: "Bubble Map",   url: "/",            icon: Radar,            group: "analytics" },
+  { title: "Overview",     url: "/overview",    icon: LayoutDashboard,  group: "analytics" },
+  { title: "Performance",  url: "/performance", icon: TrendingUp,       group: "analytics" },
+  { title: "Leaderboard",  url: "/leaderboard", icon: Trophy,           group: "analytics" },
+  { title: "Cross-Chain",  url: "/benchmarks",  icon: GitCompareArrows, group: "analytics" },
+  { title: "My Agents",    url: "/watchlist",   icon: Star,             group: "analytics" },
+  { title: "Failures",     url: "/failures",    icon: Bug,              group: "tools" },
+  { title: "How It Works", url: "/how-it-works",icon: BookOpen,         group: "tools" },
+] as const;
 
 export function AppSidebar() {
   const { state, setOpenMobile, toggleSidebar } = useSidebar();
@@ -36,16 +44,19 @@ export function AppSidebar() {
   const { chain, isLoading, lastRefreshed, trackedAgents } = useApp();
 
   const handleNavClick = (url: string) => {
-    setOpenMobile(false);
+    setOpenMobile(false); // auto-close mobile drawer
     navigate(url);
   };
 
-  const mainItems = NAV_ITEMS.filter(i => i.group === "main");
+  const isActive = (url: string) =>
+    url === "/" ? location.pathname === "/" : location.pathname === url;
+
+  const mainItems = NAV_ITEMS.filter(i => i.group === "analytics");
   const toolItems = NAV_ITEMS.filter(i => i.group === "tools");
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
-      {/* Logo */}
+      {/* ── Logo ── */}
       <SidebarHeader className="px-3 py-3.5 border-b border-sidebar-border">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-neon-sm">
@@ -60,8 +71,11 @@ export function AppSidebar() {
             </div>
           )}
           {!collapsed && (
-            <button onClick={toggleSidebar}
-              className="ml-auto text-foreground-subtle hover:text-foreground transition-colors p-1 rounded-md hidden md:flex hover:bg-accent/50">
+            <button
+              onClick={toggleSidebar}
+              className="ml-auto text-foreground-subtle hover:text-foreground transition-colors p-1 rounded-md hidden md:flex hover:bg-accent/50"
+              aria-label="Collapse sidebar"
+            >
               <ChevronLeft size={13} />
             </button>
           )}
@@ -69,7 +83,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="py-3 px-2 space-y-1">
-        {/* Main nav group */}
+        {/* ── Analytics group ── */}
         <SidebarGroup>
           {!collapsed && (
             <p className="text-[9px] uppercase tracking-widest text-foreground-subtle font-semibold px-2 mb-2">
@@ -79,7 +93,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu className="space-y-0.5">
               {mainItems.map(item => {
-                const active = location.pathname === item.url;
+                const active = isActive(item.url);
                 const badge = item.url === "/watchlist" ? trackedAgents.length : 0;
                 return (
                   <SidebarMenuItem key={item.url}>
@@ -112,7 +126,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Tools group */}
+        {/* ── Tools group ── */}
         <SidebarGroup className="mt-2">
           {!collapsed && (
             <p className="text-[9px] uppercase tracking-widest text-foreground-subtle font-semibold px-2 mb-2 mt-2">
@@ -122,7 +136,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu className="space-y-0.5">
               {toolItems.map(item => {
-                const active = location.pathname === item.url;
+                const active = isActive(item.url);
                 return (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
@@ -148,11 +162,14 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Footer status */}
+      {/* ── Footer status ── */}
       <SidebarFooter className="px-3 py-3 border-t border-sidebar-border">
         {collapsed ? (
-          <button onClick={toggleSidebar}
-            className="w-full flex items-center justify-center text-foreground-subtle hover:text-foreground transition-colors p-1.5 rounded-lg hidden md:flex hover:bg-accent/50">
+          <button
+            onClick={toggleSidebar}
+            className="w-full flex items-center justify-center text-foreground-subtle hover:text-foreground transition-colors p-1.5 rounded-lg hidden md:flex hover:bg-accent/50"
+            aria-label="Expand sidebar"
+          >
             <ChevronRight size={13} />
           </button>
         ) : (
