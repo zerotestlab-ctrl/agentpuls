@@ -23,9 +23,14 @@ export default function MyTrackedAgents() {
   const [agentMetrics, setAgentMetrics] = useState<Record<string, AgentMetrics>>({});
   const [loadingSet, setLoadingSet] = useState<Set<string>>(new Set());
 
+const ETH_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
+
   const loadAll = useCallback(async () => {
     if (!hasUserKey) return;
-    const toLoad = trackedAgents.filter(a => !metricsMap[a.address] && !agentMetrics[a.address]);
+    // Filter out any tracked agents with invalid address format before API calls
+    const toLoad = trackedAgents.filter(
+      a => ETH_ADDR_RE.test(a.address) && !metricsMap[a.address] && !agentMetrics[a.address]
+    );
     if (!toLoad.length) return;
     setLoadingSet(new Set(toLoad.map(a => a.address)));
     const results = await Promise.allSettled(
