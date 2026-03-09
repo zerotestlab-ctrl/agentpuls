@@ -114,15 +114,25 @@ export function parseFailureReason(tx: CovalentTx): FailureReason {
  * @param apiKey  - Covalent API key
  * @param pageSize - Max items (default 50)
  */
+const ETH_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
+
 export async function fetchTransactions(
   chain: SupportedChain,
   address: string,
   apiKey: string,
   pageSize = 50,
 ): Promise<CovalentTx[]> {
-  const url = `${COVALENT_BASE}/${chain}/address/${address}/transactions_v3/?page-size=${pageSize}&no-logs=false&key=${apiKey}`;
+  // Guard: reject malformed addresses before injecting into URL path
+  if (!ETH_ADDR_RE.test(address)) {
+    throw new Error(`Invalid Ethereum address format: "${address}"`);
+  }
 
-  const res = await fetch(url);
+  // Use HTTP Basic Auth (key as username, empty password) — keeps key out of URLs,
+  // browser history, proxy logs, and Referer headers.
+  const url = `${COVALENT_BASE}/${chain}/address/${address}/transactions_v3/?page-size=${pageSize}&no-logs=false`;
+  const res = await fetch(url, {
+    headers: { Authorization: "Basic " + btoa(apiKey + ":") },
+  });
 
   if (res.status === 401 || res.status === 403) {
     throw new Error("Invalid or expired Covalent API key. Please check your settings.");
