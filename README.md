@@ -2,7 +2,7 @@
 
 **The analytics platform for on-chain AI agents** — Real-time performance analytics, success rates, failure forensics, and gas efficiency benchmarks for autonomous agents across Base, Ethereum, Avalanche and beyond.
 
-Live demo: [Coming in 24h after final export]  
+Live demo: https://agentpuls.lovable.app/  
 GitHub: https://github.com/zerotestlab-ctrl/agentpulse
 
 ## Why AgentPulse Matters
