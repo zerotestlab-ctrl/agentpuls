@@ -33,7 +33,7 @@ export interface TrackedAgent {
   addedAt: number;
 }
 
-const TRACKED_KEY = "agentpulse_tracked_v2";
+const TRACKED_KEY = "agentpuls_tracked_v2";
 
 function getTrackedAgents(): TrackedAgent[] {
   try { return JSON.parse(localStorage.getItem(TRACKED_KEY) ?? "[]"); }
@@ -146,8 +146,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsLiveMode(true);
 
       toast({
-        title: "✓ Data refreshed",
-        description: `Live data loaded for ${agents.length} agents on ${chain}`,
+        title: "✓ Live data loaded",
+        description: `${agents.length} agents refreshed on ${chain}`,
         duration: 2500,
       });
     } catch (err) {

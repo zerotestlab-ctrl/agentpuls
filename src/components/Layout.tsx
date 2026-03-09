@@ -186,29 +186,35 @@ export function Layout({ children }: LayoutProps) {
             </div>
 
             {/* Right: refresh + settings */}
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {/* Refresh — disabled with tooltip when no key */}
-              <div className="relative group">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Refresh — prominent when key available */}
+              {hasUserKey ? (
                 <Button
-                  variant="ghost"
                   size="sm"
-                  onClick={hasUserKey ? refresh : undefined}
+                  onClick={refresh}
                   disabled={isLoading}
-                  className={`h-8 w-8 p-0 rounded-lg transition-all ${
-                    hasUserKey
-                      ? "text-foreground-muted hover:text-foreground hover:bg-accent/50"
-                      : "text-foreground-subtle cursor-not-allowed opacity-40"
-                  }`}
-                  title={hasUserKey ? "Refresh live data" : "Add GoldRush key first"}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5 h-8 px-3 text-xs font-semibold shadow-neon-sm rounded-lg transition-all"
+                  title="Refresh live data"
                 >
-                  <RefreshCw size={14} className={isLoading ? "animate-spin text-primary" : ""} />
+                  <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+                  <span className="hidden sm:inline">{isLoading ? "Loading…" : "Refresh"}</span>
                 </Button>
-                {!hasUserKey && (
+              ) : (
+                <div className="relative group">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled
+                    className="h-8 w-8 p-0 rounded-lg text-foreground-subtle cursor-not-allowed opacity-40"
+                    title="Add GoldRush key first"
+                  >
+                    <RefreshCw size={14} />
+                  </Button>
                   <div className="absolute right-0 top-full mt-1.5 z-50 bg-background-card border border-border rounded-lg px-2.5 py-1.5 text-[10px] text-foreground-muted whitespace-nowrap shadow-card-elevated pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
                     Add GoldRush key first
                   </div>
-                )}
-              </div>
+                </div>
+              )}
               <Button
                 variant="ghost"
                 size="sm"

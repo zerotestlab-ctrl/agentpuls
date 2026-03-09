@@ -7,12 +7,15 @@ import { useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "@/contexts/AppContext";
-import { CHAIN_LABELS, shortAddress } from "@/lib/agents";
+import { CHAIN_LABELS, KNOWN_AGENTS, shortAddress } from "@/lib/agents";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Zap, Clock, KeyRound } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { RefreshCw, Clock, KeyRound, Search, X, Activity } from "lucide-react";
 
 const TIME_FILTERS = ["4H", "8H", "24H", "7D"] as const;
 type TimeFilter = typeof TIME_FILTERS[number];
+
+const ETH_ADDR = /^0x[0-9a-fA-F]{40}$/;
 
 function successColor(rate: number): string {
   if (rate >= 90) return "hsl(142,76%,48%)";
@@ -50,9 +53,34 @@ export default function BubbleMap() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("24H");
   const [hoveredBubble, setHoveredBubble] = useState<BubbleData | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const metrics = Object.values(metricsMap);
+
+  // Search logic
+  const searchResults = searchQuery.trim().length > 1
+    ? KNOWN_AGENTS.filter(a =>
+        a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.address.toLowerCase().includes(searchQuery.toLowerCase())
+      ).slice(0, 6)
+    : [];
+
+  const handleSearchSubmit = (address?: string) => {
+    const addr = address ?? searchQuery.trim();
+    if (ETH_ADDR.test(addr)) {
+      navigate(`/agent/${addr}`);
+      setSearchQuery("");
+    } else if (addr) {
+      const found = KNOWN_AGENTS.find(a => a.name.toLowerCase().includes(addr.toLowerCase()));
+      if (found) {
+        navigate(`/agent/${found.address}`);
+        setSearchQuery("");
+      }
+    }
+  };
 
   const bubbles = useMemo((): BubbleData[] => {
     if (metrics.length === 0) return [];
@@ -98,7 +126,7 @@ export default function BubbleMap() {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 space-y-4 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -134,6 +162,73 @@ export default function BubbleMap() {
               <KeyRound size={12} className="text-primary" /> Add Key for Live
             </Button>
           )}
+        </div>
+      </div>
+
+      {/* ── Sticky search bar ── */}
+      <div className="sticky top-[56px] z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2.5 bg-background/95 backdrop-blur-xl border-b border-border">
+        <div className="relative max-w-2xl">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-subtle pointer-events-none z-10" />
+          <Input
+            ref={searchRef}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+            onKeyDown={e => {
+              if (e.key === "Enter") handleSearchSubmit();
+              if (e.key === "Escape") { setSearchQuery(""); searchRef.current?.blur(); }
+            }}
+            placeholder="Search any agent address or ERC-8004 ID…"
+            className="pl-9 pr-10 h-10 bg-background-elevated border-border text-sm focus:border-primary/50 rounded-xl placeholder:text-foreground-subtle transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground transition-colors"
+            >
+              <X size={12} />
+            </button>
+          )}
+
+          {/* Search dropdown */}
+          <AnimatePresence>
+            {searchFocused && (searchResults.length > 0 || (searchQuery.length > 1 && ETH_ADDR.test(searchQuery))) && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-full mt-1.5 left-0 right-0 bg-background-card border border-border rounded-xl shadow-card-elevated z-50 overflow-hidden"
+              >
+                {ETH_ADDR.test(searchQuery) && (
+                  <button onMouseDown={() => handleSearchSubmit(searchQuery)}
+                    className="w-full px-3.5 py-3 flex items-center gap-3 hover:bg-accent/50 text-left transition-colors border-b border-border/50">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Search size={11} className="text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">Open agent profile</p>
+                      <p className="text-[10px] text-foreground-muted font-mono">{shortAddress(searchQuery)}</p>
+                    </div>
+                  </button>
+                )}
+                {searchResults.map(agent => (
+                  <button key={agent.address} onMouseDown={() => handleSearchSubmit(agent.address)}
+                    className="w-full px-3.5 py-3 flex items-center gap-3 hover:bg-accent/50 text-left transition-colors last:rounded-b-xl">
+                    <div className="w-7 h-7 rounded-lg bg-primary/8 border border-primary/15 flex items-center justify-center flex-shrink-0">
+                      <Activity size={11} className="text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-foreground truncate">{agent.name}</p>
+                      <p className="text-[10px] text-foreground-muted font-mono">{shortAddress(agent.address)}</p>
+                    </div>
+                    <span className="badge-info text-[9px] px-1.5 py-0.5 rounded-md flex-shrink-0">{agent.framework}</span>
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -206,7 +301,7 @@ export default function BubbleMap() {
                   strokeWidth="0.2"
                   opacity="0.35"
                 />
-                {/* Main bubble */}
+                {/* Main bubble — clickable → Agent Profile */}
                 <circle
                   cx={bubble.x} cy={bubble.y}
                   r={bubble.size / 100 * 5.5}

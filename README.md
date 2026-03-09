@@ -11,7 +11,7 @@ GitHub: https://github.com/zerotestlab-ctrl/agentpuls
 Dune shows volume. Virtuals shows its own revenue.  
 **Nobody** shows whether agents actually succeed, why they fail, or which frameworks are truly efficient.
 
-AgentPulse is the missing public-good layer: neutral, open, performance-first analytics that every agent builder, protocol, and investor needs daily.
+Agentpuls is the missing public-good layer: neutral, open, performance-first analytics that every agent builder, protocol, and investor needs daily.
 
 ## Core Features
 
