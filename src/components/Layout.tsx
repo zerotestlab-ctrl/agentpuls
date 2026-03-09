@@ -109,7 +109,7 @@ export function Layout({ children }: LayoutProps) {
               <SidebarTrigger className="text-foreground-muted hover:text-foreground h-8 w-8" />
               <div className="flex items-center gap-2 select-none cursor-pointer" onClick={() => navigate("/")}>
                 <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-neon-sm flex-shrink-0">
-                  <Zap size={13} className="text-primary-foreground" />
+                  <Activity size={13} className="text-primary-foreground" />
                 </div>
                 <span className="font-bold text-sm text-foreground hidden sm:block tracking-tight">Agentpuls</span>
               </div>
@@ -171,7 +171,7 @@ export function Layout({ children }: LayoutProps) {
                       <button key={agent.address} onMouseDown={() => handleSearchSubmit(agent.address)}
                         className="w-full px-3.5 py-3 flex items-center gap-3 hover:bg-accent/50 text-left transition-colors last:rounded-b-xl">
                         <div className="w-7 h-7 rounded-lg bg-primary/8 border border-primary/15 flex items-center justify-center flex-shrink-0">
-                          <Zap size={11} className="text-primary" />
+            <Zap size={11} className="text-primary" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium text-foreground truncate">{agent.name}</p>

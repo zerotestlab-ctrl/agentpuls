@@ -60,7 +60,7 @@ export function AppSidebar() {
       <SidebarHeader className="px-3 py-3.5 border-b border-sidebar-border">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-neon-sm">
-            <Zap size={13} className="text-primary-foreground" />
+            <Activity size={13} className="text-primary-foreground" />
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
